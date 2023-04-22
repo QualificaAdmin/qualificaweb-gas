@@ -45,7 +45,7 @@ function getCertificado(data) {
     inicio: "18/04/2023",
     fim: "30/07/2023",
   }
-  var t = HtmlService.createTemplateFromFile('template_certificado');
+  var t = HtmlService.createTemplateFromFile('src/template/certificado');
   t.data = data;
   return t.evaluate().getContent();
 }
@@ -79,11 +79,7 @@ function getToken() {
 }
 
 function getPastaBancoDeDados() {
-  //try {
-    return DriveApp.getFolderById('1WOhffBcRIfDORM5FkuvfO1v7j_bbVdHV');
-  //} catch (ex) {
-  //  throw new Error('Você não tem acesso ao banco de dados');
-  //}
+  return DriveApp.getFolderById('1WOhffBcRIfDORM5FkuvfO1v7j_bbVdHV');
 }
 
 function getAnos() {

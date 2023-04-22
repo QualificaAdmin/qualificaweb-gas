@@ -12,7 +12,7 @@ class Router {
     if (this.routes.hasOwnProperty(path)) {
       return this.routes[path](request);
     } else {
-      return HtmlService.createTemplateFromFile('login').evaluate(); // or return a 404 error page
+      return HtmlService.createTemplateFromFile('src/views/public/login').evaluate(); // or return a 404 error page
     }
   }
 }
@@ -20,15 +20,11 @@ class Router {
 const router = new Router();
 
 router.addRoute('login', (request) => {
-  return HtmlService.createTemplateFromFile('login').evaluate();
-});
-
-router.addRoute('teste', (request) => {
-  return HtmlService.createTemplateFromFile('teste').evaluate();
+  return HtmlService.createTemplateFromFile('src/views/public/login').evaluate();
 });
 
 router.addRoute('certificado', (request) => {
-  var t = HtmlService.createTemplateFromFile('template_certificado');
+  var t = HtmlService.createTemplateFromFile('src/template/template_certificado');
   t.data = {
     nome: "Jean Carlos Santos Serafini de Sousa",
     cpf: "090.367.706-70",
@@ -100,7 +96,7 @@ router.addRoute('frequencia', (request) => {
       const authInfo = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
       if (authInfo.getAuthorizationStatus() == 'REQUIRED')
         Logger.log('Link Script Authorization: ' + authInfo.getAuthorizationUrl());
-      return HtmlService.createTemplateFromFile('frequencia').evaluate();
+      return HtmlService.createTemplateFromFile('src/views/private/frequencia').evaluate();
     } else {
       const authorizationUrl = service.getAuthorizationUrl();
       Logger.log('Autorização necessária.Link...' + authorizationUrl);
