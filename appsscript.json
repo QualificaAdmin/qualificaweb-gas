@@ -1,0 +1,30 @@
+{
+  "timeZone": "America/Sao_Paulo",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "dependencies": {
+    "libraries": [
+      {
+        "userSymbol": "OAuth2",
+        "libraryId": "1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF",
+        "version": "43"
+      }
+    ],
+    "enabledAdvancedServices": [
+      {
+        "userSymbol": "People",
+        "version": "v1",
+        "serviceId": "peopleapi"
+      }
+    ]
+  },
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/spreadsheets"
+  ],
+  "webapp": {
+    "executeAs": "USER_ACCESSING",
+    "access": "ANYONE"
+  }
+}
