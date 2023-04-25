@@ -50,7 +50,6 @@ function getCertificado(data) {
   return t.evaluate().getContent();
 }
 
-
 function getUserInfo() {
     const people = People.People.getBatchGet({
       resourceNames: ['people/me'],
@@ -65,8 +64,8 @@ function getUserInfo() {
     return json
    }
    return null
-  
 }
+
 function getUserAndToken() {
   return {
     user: Session.getActiveUser().getEmail(),
@@ -76,10 +75,6 @@ function getUserAndToken() {
 
 function getToken() {
   return ScriptApp.getOAuthToken();
-}
-
-function getPastaBancoDeDados() {
-  return DriveApp.getFolderById('1WOhffBcRIfDORM5FkuvfO1v7j_bbVdHV');
 }
 
 function getAnos() {
@@ -92,16 +87,6 @@ function getAnos() {
   return anos;
 }
 
-function abrePastaAno(ano) {
-  const pasta = getPastaBancoDeDados();
-  let pastaAno = pasta.getFoldersByName(ano)
-  if (pastaAno.hasNext()) {
-    return pastaAno = pasta.getFoldersByName(ano).next()
-  }
-  else {
-    throw new Error('Ano inválido')
-  }
-}
 function getProgramas(ano) {
   const pastasProgramas = abrePastaAno(ano).getFolders();
   let programas = [];
@@ -112,17 +97,6 @@ function getProgramas(ano) {
   return programas;
 }
 
-function abrePastaPrograma(ano, programa) {
-  const pasta = abrePastaAno(ano);
-  let pastaPrograma = pasta.getFoldersByName(programa)
-  if (pastaPrograma.hasNext()) {
-    return pastaPrograma.next()
-  }
-  else {
-    throw new Error('Programa inválido')
-  }
-}
-
 function getTurmas(ano, programa) {
   const pastasTurmas = abrePastaPrograma(ano, programa).getFolders()
   var turmas = [];
@@ -131,45 +105,6 @@ function getTurmas(ano, programa) {
     turmas.push(pasta.getName());
   }
   return turmas;
-}
-
-function abrePastaTurma(ano, programa, turma) {
-  const pasta = abrePastaPrograma(ano, programa);
-  let pastaTurma = pasta.getFoldersByName(turma)
-  if (pastaTurma.hasNext()) {
-    return pastaTurma.next()
-  }
-  else {
-    throw new Error('Turma inválido')
-  }
-}
-
-function getOrCreatePlanilha(pasta, nomeArquivo) {
-  var arquivos = pasta.getFilesByName(nomeArquivo);
-  if (arquivos.hasNext()) {
-    return arquivos.next();
-  } else {
-    var planilha = SpreadsheetApp.create(nomeArquivo);
-    DriveApp.getFileById(planilha.getId()).moveTo(pasta);
-    return pasta.getFilesByName(nomeArquivo).next();
-  }
-}
-
-function convertePlanilhaEmJSON(arquivoPlanilha) {
-  const planilha = SpreadsheetApp.open(arquivoPlanilha);
-  const matriz = planilha.getDataRange().getValues();
-  const json = {};
-  matriz.forEach(linha => {
-    const [chave, valor] = linha;
-    if (chave.startsWith('json'))
-      json[chave] = JSON.parse(valor)
-    else if (chave.startsWith('list'))
-      json[chave] = valor.split(',')
-    else
-      json[chave] = valor
-  });
-  const jsonString = JSON.stringify(json);
-  return jsonString;
 }
 
 function getInfoCurso(ano, programa) {
@@ -184,13 +119,6 @@ function getInfoTurma(ano, programa, turma) {
   return convertePlanilhaEmJSON(arquivoPlanilha)
 }
 
-function abrePlanilhaFrequencia(ano, programa, turma) {
-  const pastaTurma = abrePastaTurma(ano, programa, turma)
-  const arquivoPlanilha = getOrCreatePlanilha(pastaTurma, 'Frequência')
-  const planilha = SpreadsheetApp.open(arquivoPlanilha);
-  return planilha;
-}
-
 function getFrequencia(ano, programa, turma) {
   const planilha = abrePlanilhaFrequencia(ano, programa, turma).getSheets()[0];
   const matriz = planilha.getDataRange().getValues();
@@ -202,7 +130,6 @@ function getFrequencia(ano, programa, turma) {
   );
   return JSON.stringify(json);
 }
-
 
 function setFrequencia(ano, programa, turma, jsonString) {
   const json = JSON.parse(jsonString);

@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack --mode none",
     "gopen":"clasp open --webapp",
-    "gpush":"clasp push",
+    "gpush":"npm run build && clasp push",
     "gpull":"clasp pull",
     "gclone":"clasp clone 1sU_YmoMy5Jl75hW-6hTdoSvkQEmSEk6Hx_hrAdqEorirpB54ppNfqMrN",
     "gwatch":"clasp pull --watch"

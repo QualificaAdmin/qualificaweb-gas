@@ -156,7 +156,7 @@
                           document.write(page);
                           document.close();
                         })
-                        .include('src/views/public/login')
+                        .include('src/views/public/login/index')
                     })
                     .catch((error) => {
                       console.error(error);
@@ -185,6 +185,8 @@
   <script src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@2.1.7/dist/loadingoverlay.min.js">
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-toast-plugin/1.3.2/jquery.toast.min.js"></script>
+  <?!= include('src/services/index') ?>
+
   <script>
     var icon = {
       info:'info',

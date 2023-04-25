@@ -1,0 +1,27 @@
+<script>
+  class GASService {
+    constructor() {
+    }
+    static run(method, params = null) {
+      if (params == null) {
+        google.script.run
+          .withSuccessHandler(function (response) {
+            return JSON.parse(response);
+          })
+          .withFailureHandler(function (ex) {
+            throw ex;
+          })
+          [method]();
+      } else {
+        google.script.run
+          .withSuccessHandler(function (response) {
+            return JSON.parse(response);
+          })
+          .withFailureHandler(function (ex) {
+            throw ex;
+          })
+          [method](params);
+      }
+    }
+  }
+</script>

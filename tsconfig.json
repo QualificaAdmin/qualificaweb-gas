@@ -1,8 +1,14 @@
 {
   "compilerOptions": {
-    "target": "ESNEXT",
+    "target": "ES2019",
+    "module":"ESNext",
     "strict": true,
-    "skipLibCheck": true,
+    "importHelpers": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "removeComments": true,
+     "skipLibCheck": true,
+     "sourceMap": true,
     "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true
   }

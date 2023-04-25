@@ -1,4 +1,7 @@
 **/**
-!src/**
-!dist/**
+!src/server/**
+!src/services/**
+!src/template/**
+!src/views/**
 !appsscript.json
+!dist/**

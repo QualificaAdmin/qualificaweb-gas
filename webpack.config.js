@@ -2,10 +2,14 @@ const path = require('path');
 const GasPlugin = require('gas-webpack-plugin');
 
 const config = {
-  entry: './ts/teste.ts',
+  context: path.resolve(__dirname, 'src/ts'),
+  entry: {
+    teste:'./global.ts',
+  },
   output: {
-    path: path.resolve(__dirname, 'src/code'),
-    filename: 'teste.js'
+    path: path.resolve(__dirname, 'src/server'),
+    filename: 'private.js',
+    clean:false
   },
   module: {
     rules: [
@@ -21,7 +25,7 @@ const config = {
   resolve: {
     extensions: ['.ts']
   },
-   plugins: [
+  plugins: [
     new GasPlugin()
   ]
 };
