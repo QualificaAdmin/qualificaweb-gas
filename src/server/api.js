@@ -1,3 +1,121 @@
+function getUserInfo() {
+    const people = People.People.getBatchGet({
+      resourceNames: ['people/me'],
+      personFields: 'names,photos'
+    });
+   if(people.responses[0].httpStatusCode==200){
+    const json = {
+      nome:people.responses[0].person.names[0].unstructuredName,
+      foto:people.responses[0].person.photos[0].url
+    }
+    return json
+   }
+   return null
+}
+
+function getData(){
+  const json = {
+    user:getUserInfo(),
+    dropdowns:todosDiretoriosEmJSON()
+  }
+  return json;
+}
+
+function getUserAndToken() {
+  return {
+    user: Session.getActiveUser().getEmail(),
+    token: ScriptApp.getOAuthToken()
+  }
+}
+
+function getToken() {
+  return ScriptApp.getOAuthToken();
+}
+
+function getLoginToken(idToken){
+  return CacheService.getUserCache().get('idToken')
+}
+
+function setLoginToken(idToken){
+  CacheService.getUserCache().put('idToken',idToken)
+}
+
+function getAnos() {
+  const pasta = Diretorio.porCaminho(`/`);
+  return Diretorio.subpastasEmJson(pasta);
+}
+
+function getPolos(ano) {
+  const pasta = Diretorio.porCaminho(`/${ano}`);
+  return Diretorio.subpastasEmJson(pasta);
+}
+
+function getProgramas(ano, polo) {
+  const pasta = Diretorio.porCaminho(`/${ano}/${polo}`);
+  return Diretorio.subpastasEmJson(pasta);
+}
+
+function getCursos(ano, polo, programa) {
+  const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}`);
+  return Diretorio.subpastasEmJson(pasta);
+}
+
+function getTurmas(ano, polo, programa, curso) {
+  const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}`);
+  return Diretorio.subpastasEmJson(pasta);
+}
+
+function getDisciplinas(ano, polo, programa, curso, turma) {
+  const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}/${turma}`);
+  return Diretorio.subpastasEmJson(pasta);
+}
+
+function getInfoCurso(ano, programa) {
+  const pastaPrograma = abrePastaPrograma(ano, programa)
+  const arquivoPlanilha = getOrCreatePlanilha(pastaPrograma, 'InfoCurso');
+  return convertePlanilhaEmJSON(arquivoPlanilha)
+}
+
+function getInfoTurma(ano, programa, turma) {
+  const pastaTurma = abrePastaTurma(ano, programa, turma)
+  const arquivoPlanilha = getOrCreatePlanilha(pastaTurma, 'InfoTurma')
+  return convertePlanilhaEmJSON(arquivoPlanilha)
+}
+
+function getFrequencia(ano, polo, programa, curso, turma, disciplina) {
+  const planilha = abrePlanilhaFrequencia(ano, polo, programa, curso, turma, disciplina).getSheets()[0];
+  const matriz = planilha.getDataRange().getValues();
+  const [cabecalho, ...linhas] = matriz;
+  const json = linhas.map((linha) => Object.fromEntries(linha.map((valor, index) => [cabecalho[index], valor])));
+  return JSON.stringify(json);
+}
+
+function setFrequencia(ano, polo, programa, curso, turma, disciplina, jsonString) {
+  const json = JSON.parse(jsonString);
+  const diasAula = Array.from(new Set(json.map((item) => Object.keys(item.Data)).flat()));
+  const matriz = [["Nome", ...diasAula]];
+  json.forEach((item) => {
+      const linha = [item.Nome];
+      diasAula.forEach((data) => {
+          linha.push(item.Data[data] || "");
+      });
+      matriz.push(linha);
+  });
+  const planilha = abrePlanilhaFrequencia(ano, polo, programa, curso, turma, disciplina).getSheets()[0];
+  const ultimaLinha = planilha.getLastRow();
+  if (ultimaLinha > 1) {
+      planilha
+          .getRange(2, 1, ultimaLinha - 1, planilha.getLastColumn())
+          .clearContent();
+  }
+  if (matriz.length > 1) {
+      const intervalo = planilha.getRange(2, 1, matriz.length - 1, matriz[0].length);
+      intervalo.clearContent();
+      intervalo.setValues(matriz.slice(1));
+      return;
+  }
+  throw new Error("Ocorreu um problema ao salvar os dados");
+}
 function getCertificado(data) {
   data = {
     nome: "Jean Carlos Santos Serafini de Sousa",
@@ -48,112 +166,4 @@ function getCertificado(data) {
   var t = HtmlService.createTemplateFromFile('src/template/certificado');
   t.data = data;
   return t.evaluate().getContent();
-}
-
-function getUserInfo() {
-    const people = People.People.getBatchGet({
-      resourceNames: ['people/me'],
-      personFields: 'names,photos'
-    });
-   if(people.responses[0].httpStatusCode==200){
-    const json = {
-      nome:people.responses[0].person.names[0].unstructuredName,
-      foto:people.responses[0].person.photos[0].url
-    }
-    console.log(JSON.stringify(json))
-    return json
-   }
-   return null
-}
-
-function getUserAndToken() {
-  return {
-    user: Session.getActiveUser().getEmail(),
-    token: ScriptApp.getOAuthToken()
-  }
-}
-
-function getToken() {
-  return ScriptApp.getOAuthToken();
-}
-
-function getAnos() {
-  const pastasAnos = getPastaBancoDeDados().getFolders();
-  let anos = [];
-  while (pastasAnos.hasNext()) {
-    const pasta = pastasAnos.next();
-    anos.push(pasta.getName());
-  }
-  return anos;
-}
-
-function getProgramas(ano) {
-  const pastasProgramas = abrePastaAno(ano).getFolders();
-  let programas = [];
-  while (pastasProgramas.hasNext()) {
-    const pasta = pastasProgramas.next();
-    programas.push(pasta.getName());
-  }
-  return programas;
-}
-
-function getTurmas(ano, programa) {
-  const pastasTurmas = abrePastaPrograma(ano, programa).getFolders()
-  var turmas = [];
-  while (pastasTurmas.hasNext()) {
-    var pasta = pastasTurmas.next();
-    turmas.push(pasta.getName());
-  }
-  return turmas;
-}
-
-function getInfoCurso(ano, programa) {
-  const pastaPrograma = abrePastaPrograma(ano, programa)
-  const arquivoPlanilha = getOrCreatePlanilha(pastaPrograma, 'InfoCurso');
-  return convertePlanilhaEmJSON(arquivoPlanilha)
-}
-
-function getInfoTurma(ano, programa, turma) {
-  const pastaTurma = abrePastaTurma(ano, programa, turma)
-  const arquivoPlanilha = getOrCreatePlanilha(pastaTurma, 'InfoTurma')
-  return convertePlanilhaEmJSON(arquivoPlanilha)
-}
-
-function getFrequencia(ano, programa, turma) {
-  const planilha = abrePlanilhaFrequencia(ano, programa, turma).getSheets()[0];
-  const matriz = planilha.getDataRange().getValues();
-  const [cabecalho, ...linhas] = matriz;
-  const json = linhas.map(linha =>
-    Object.fromEntries(linha.map((valor, index) =>
-      [cabecalho[index], valor]
-    ))
-  );
-  return JSON.stringify(json);
-}
-
-function setFrequencia(ano, programa, turma, jsonString) {
-  const json = JSON.parse(jsonString);
-  const diasAula = Array.from(new Set(json.map(item => Object.keys(item.Data)).flat()));
-  const matriz = [['Nome', ...diasAula]];
-
-  json.forEach(item => {
-    const linha = [item.Nome];
-    diasAula.forEach(data => {
-      linha.push(item.Data[data] || '');
-    });
-    matriz.push(linha);
-  });
-  const planilha = abrePlanilhaFrequencia(ano, programa, turma).getSheets()[0];
-
-  const ultimaLinha = planilha.getLastRow();
-  if (ultimaLinha > 1) {
-    planilha.getRange(2, 1, ultimaLinha - 1, planilha.getLastColumn()).clearContent();
-  }
-  if (matriz.length > 1) {
-    const intervalo = planilha.getRange(2, 1, matriz.length - 1, matriz[0].length)
-    intervalo.clearContent()
-    intervalo.setValues(matriz.slice(1));
-    return
-  }
-  throw new Error('Ocorreu um problema ao salvar os dados')
 }

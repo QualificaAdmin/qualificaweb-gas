@@ -1,4 +1,6 @@
-export function convertePlanilhaEmJSON(arquivoPlanilha: GoogleAppsScript.Drive.File) {
+export function convertePlanilhaEmJSON(
+  arquivoPlanilha: GoogleAppsScript.Drive.File
+) {
   const planilha: GoogleAppsScript.Spreadsheet.Spreadsheet =
     SpreadsheetApp.open(arquivoPlanilha);
   const matriz: string[][] = planilha.getDataRange().getValues();
@@ -12,71 +14,171 @@ export function convertePlanilhaEmJSON(arquivoPlanilha: GoogleAppsScript.Drive.F
   const jsonString = JSON.stringify(json);
   return jsonString;
 }
-
-export function getPastaBancoDeDados() {
+export class Diretorio {
+  static root = DriveApp.getFolderById("1WOhffBcRIfDORM5FkuvfO1v7j_bbVdHV");
+  static abrir(
+    pastaOrigem: GoogleAppsScript.Drive.Folder,
+    nomePastaDestino: string
+  ): GoogleAppsScript.Drive.Folder {
+    let pastas = pastaOrigem.getFoldersByName(nomePastaDestino);
+    if (pastas.hasNext()) {
+      return pastas.next();
+    } else {
+      throw new Error(`Não foi possível abrir ${nomePastaDestino}!`);
+    }
+  }
+  static porCaminho(caminho: string) {
+    const itens = caminho.split("/");
+    const pos =
+      itens[itens.length - 1] == "" ? itens.length - 2 : itens.length - 1;
+    let pasta = this.root;
+    for (let i = 1; i <= pos; i++) {
+      pasta = Diretorio.abrir(pasta, itens[i]);
+    }
+    return pasta;
+  }
+  static subpastasEmJson(pasta: GoogleAppsScript.Drive.Folder) {
+    const subpastas = pasta.getFolders();
+    let json = [];
+    while (subpastas.hasNext()) {
+      const subpasta = subpastas.next();
+      json.push(subpasta.getName());
+    }
+    return json;
+  }
+}
+/*
+    bancodedados/ano/polo/programa/curso/turma/disciplina/frequencia
+ */
+/*
+export function getPastaBancoDeDados(): GoogleAppsScript.Drive.Folder {
   return DriveApp.getFolderById("1WOhffBcRIfDORM5FkuvfO1v7j_bbVdHV");
 }
 
-export function abrePastaAno(ano: string) {
+export function abrePastaAno(ano: string): GoogleAppsScript.Drive.Folder {
   const pasta = getPastaBancoDeDados();
-  let pastaAno = pasta.getFoldersByName(ano);
-  if (pastaAno.hasNext()) {
-    return pastaAno.next();
-  } else {
-    throw new Error("Ano inválido");
-  }
+  return Diretorio.abrir(pasta, ano);
 }
-
-export function getProgramas(ano: string) {
-  const pastasProgramas = abrePastaAno(ano).getFolders();
-  let programas = [];
-  while (pastasProgramas.hasNext()) {
-    const pasta = pastasProgramas.next();
-    programas.push(pasta.getName());
-  }
-  return programas;
-}
-
-export function abrePastaPrograma(ano: string, programa: string) {
+export function abrePastaPolo(
+  ano: string,
+  polo: string
+): GoogleAppsScript.Drive.Folder {
   const pasta = abrePastaAno(ano);
-  let pastaPrograma = pasta.getFoldersByName(programa);
-  if (pastaPrograma.hasNext()) {
-    return pastaPrograma.next();
-  } else {
-    throw new Error("Programa inválido");
+  return Diretorio.abrir(pasta, polo);
+}
+export function abrePastaPrograma(
+  ano: string,
+  polo: string,
+  programa: string
+): GoogleAppsScript.Drive.Folder {
+  const pasta = abrePastaPolo(ano, polo);
+  return Diretorio.abrir(pasta, programa);
+}
+export function abrePastaCurso(
+  ano: string,
+  polo: string,
+  programa: string,
+  curso: string
+): GoogleAppsScript.Drive.Folder {
+  const pasta = abrePastaPrograma(ano, polo, programa);
+  return Diretorio.abrir(pasta, curso);
+}
+export function abrePastaTurma(
+  ano: string,
+  polo: string,
+  programa: string,
+  curso: string,
+  turma: string
+): GoogleAppsScript.Drive.Folder {
+  const pasta = abrePastaCurso(ano, polo, programa, curso);
+  return Diretorio.abrir(pasta, turma);
+}
+export function abrePastaDisciplina(
+  ano: string,
+  polo: string,
+  programa: string,
+  curso: string,
+  turma: string,
+  disciplina: string
+): GoogleAppsScript.Drive.Folder {
+  const pasta = abrePastaTurma(ano, polo, programa, curso, turma);
+  return Diretorio.abrir(pasta, disciplina);
+}
+*/
+export function todosDiretoriosEmJSON(): string {
+  var root = Diretorio.porCaminho("/");
+  var data = goesDown(root);
+  var json = data;
+  return json;
+}
+
+export function goesDown(node: GoogleAppsScript.Drive.Folder): any {
+  var folders = node.getFolders();
+  var data = [];
+  while (folders.hasNext()) {
+    var folder = folders.next();
+    var folderInfo = {
+      name: folder.getName(),
+      //id: folder.getId(),
+      subfolders: goesDown(folder),
+    };
+    data.push(folderInfo);
   }
+  return data;
+}
+export function abrePlanilhaFrequencia(
+  ano: string,
+  polo: string,
+  programa: string,
+  curso: string,
+  turma: string,
+  disciplina: string
+) {
+  const pasta = Diretorio.porCaminho(
+    `/${ano}/${polo}/${programa}/${curso}/${turma}/${disciplina}`
+  );
+  const arquivoPlanilha = getOrCreatePlanilha(pasta, "Frequência");
+  const planilha = SpreadsheetApp.open(arquivoPlanilha);
+  return planilha;
 }
 
 export function getAnos() {
-  const pastasAnos = getPastaBancoDeDados().getFolders();
-  let anos = [];
-  while (pastasAnos.hasNext()) {
-    const pasta = pastasAnos.next();
-    anos.push(pasta.getName());
-  }
-  return anos;
+  const pasta = Diretorio.porCaminho(`/`);
+  return Diretorio.subpastasEmJson(pasta);
 }
-
-export function getTurmas(ano: string, programa: string) {
-  const pastasTurmas = abrePastaPrograma(ano, programa).getFolders();
-  var turmas = [];
-  while (pastasTurmas.hasNext()) {
-    var pasta = pastasTurmas.next();
-    turmas.push(pasta.getName());
-  }
-  return turmas;
+export function getPolos(ano: string) {
+  const pasta = Diretorio.porCaminho(`/${ano}`);
+  return Diretorio.subpastasEmJson(pasta);
 }
-
-export function abrePastaTurma(ano: string, programa: string, turma: string) {
-  const pasta = abrePastaPrograma(ano, programa);
-  let pastaTurma = pasta.getFoldersByName(turma);
-  if (pastaTurma.hasNext()) {
-    return pastaTurma.next();
-  } else {
-    throw new Error("Turma inválido");
-  }
+export function getProgramas(ano: string, polo: string) {
+  const pasta = Diretorio.porCaminho(`/${ano}/${polo}`);
+  return Diretorio.subpastasEmJson(pasta);
 }
-
+export function getCursos(ano: string, polo: string, programa: string) {
+  const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}`);
+  return Diretorio.subpastasEmJson(pasta);
+}
+export function getTurmas(
+  ano: string,
+  polo: string,
+  programa: string,
+  curso: string
+) {
+  const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}`);
+  return Diretorio.subpastasEmJson(pasta);
+}
+export function getDisciplinas(
+  ano: string,
+  polo: string,
+  programa: string,
+  curso: string,
+  turma: string
+) {
+  const pasta = Diretorio.porCaminho(
+    `/${ano}/${polo}/${programa}/${curso}/${turma}`
+  );
+  return Diretorio.subpastasEmJson(pasta);
+}
 export function getOrCreatePlanilha(
   pasta: GoogleAppsScript.Drive.Folder,
   nomeArquivo: string
@@ -158,7 +260,6 @@ export function getUserInfo() {
       nome: people.responses[0].person.names[0].unstructuredName,
       foto: people.responses[0].person.photos[0].url,
     };
-    console.log(JSON.stringify(json));
     return json;
   }
   return null;
@@ -175,31 +276,42 @@ export function getToken() {
   return ScriptApp.getOAuthToken();
 }
 
-export function getInfoCurso(ano: string, programa: string) {
-  const pastaPrograma = abrePastaPrograma(ano, programa);
+export function getInfoCurso(ano: string, polo: string, programa: string) {
+  const pastaPrograma = Diretorio.porCaminho(`/${ano}/${polo}/${programa}`);
   const arquivoPlanilha = getOrCreatePlanilha(pastaPrograma, "InfoCurso");
   return convertePlanilhaEmJSON(arquivoPlanilha);
 }
 
-export function getInfoTurma(ano: string, programa: string, turma: string) {
-  const pastaTurma = abrePastaTurma(ano, programa, turma);
+export function getInfoTurma(
+  ano: string,
+  polo: string,
+  programa: string,
+  curso: string,
+  turma: string
+) {
+  const pastaTurma = Diretorio.porCaminho(
+    `/${ano}/${polo}/${programa}/${curso}/${turma}`
+  );
   const arquivoPlanilha = getOrCreatePlanilha(pastaTurma, "InfoTurma");
   return convertePlanilhaEmJSON(arquivoPlanilha);
 }
 
-export function abrePlanilhaFrequencia(
+export function getFrequencia(
   ano: string,
+  polo: string,
   programa: string,
-  turma: string
+  curso: string,
+  turma: string,
+  disciplina: string
 ) {
-  const pastaTurma = abrePastaTurma(ano, programa, turma);
-  const arquivoPlanilha = getOrCreatePlanilha(pastaTurma, "Frequência");
-  const planilha = SpreadsheetApp.open(arquivoPlanilha);
-  return planilha;
-}
-
-export function getFrequencia(ano: string, programa: string, turma: string) {
-  const planilha = abrePlanilhaFrequencia(ano, programa, turma).getSheets()[0];
+  const planilha = abrePlanilhaFrequencia(
+    ano,
+    polo,
+    programa,
+    curso,
+    turma,
+    disciplina
+  ).getSheets()[0];
   const matriz = planilha.getDataRange().getValues();
   const [cabecalho, ...linhas] = matriz;
   const json = linhas.map((linha) =>
@@ -210,8 +322,11 @@ export function getFrequencia(ano: string, programa: string, turma: string) {
 
 export function setFrequencia(
   ano: string,
+  polo: string,
   programa: string,
+  curso: string,
   turma: string,
+  disciplina: string,
   jsonString: string
 ) {
   const json = JSON.parse(jsonString);
@@ -227,7 +342,14 @@ export function setFrequencia(
     });
     matriz.push(linha);
   });
-  const planilha = abrePlanilhaFrequencia(ano, programa, turma).getSheets()[0];
+  const planilha = abrePlanilhaFrequencia(
+    ano,
+    polo,
+    programa,
+    curso,
+    turma,
+    disciplina
+  ).getSheets()[0];
 
   const ultimaLinha = planilha.getLastRow();
   if (ultimaLinha > 1) {

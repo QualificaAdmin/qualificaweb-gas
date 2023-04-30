@@ -1,6 +1,6 @@
 <?!= include('src/services/GASService') ?>
-<?!= include('src/services/CertificadoService') ?>
+<?!= include('src/services/BaseService') ?>
 <script>
     let api = new GASService();
-    let certificadoService =  new CertificadoService(api);
+    var baseService =  new BaseService(api);
 </script>

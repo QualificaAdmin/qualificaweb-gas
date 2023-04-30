@@ -1,39 +1,170 @@
+class RequestHandlerInterface {
+  handleRequest(request) {}
+}
+class HttpRequestHandler extends RequestHandlerInterface {
+  constructor(router) {
+    super();
+    this.router = router;
+  }
 
-class Router {
-    constructor() {
-      this.routes = {};
-      this.paths={}
+  handleRequest(request) {
+    const path = request.pathInfo;
+    if (path == [] || path == null) {
+      return HtmlService.createTemplateFromFile(
+        templates.public.login
+      ).evaluate();
     }
-  
-    addRoute(route,path, handler) {
-      this.routes[route] = handler;
-      this.paths[route] = path
-    }
-
-    getPath(route){
-        return(this.paths[route])
-    }
-  
-    handleRequest(request) {
-      const path = request.pathInfo;
-      if (this.routes.hasOwnProperty(path)) {
-        return this.routes[path](request);
-      } else {
-        return HtmlService.createTemplateFromFile('src/views/public/login/index').evaluate(); // or return a 404 error page
+    if (this.router.hasRoute(path)) {
+      const route = this.router.getRoute(path);
+      if (route.isPrivate) {
+        const user = getLoginToken();
+        if (!user) {
+          return HtmlService.createTemplateFromFile(
+            templates.public.login
+          ).evaluate();
+        } else {
+          if (!temPermissao(route)) {
+            return HtmlService.createTemplateFromFile(
+              templates.error["401"]
+            ).evaluate();
+          }
+        }
       }
+      return route.handler(request);
+    } else {
+      return HtmlService.createTemplateFromFile(
+        templates.error["404"]
+      ).evaluate();
     }
   }
-  function getPath(route){
-    return router.getPath(route)
+}
+
+// Router class to manage routes
+class Router {
+  constructor() {
+    this.routes = {};
+    this.paths = {};
   }
 
-  const router = new Router();
-  
-  router.addRoute('login','src/views/public/login/index', (request) => {
-    return HtmlService.createTemplateFromFile('src/views/public/login/index').evaluate();
-  });
-  
-  router.addRoute('certificado','src/template/template_certificado', (request) => {
+  addRoute(route, path, handler, isPrivate = false) {
+    this.routes[route] = { route, handler, isPrivate };
+    this.paths[route] = path;
+  }
+
+  getRoute(path) {
+    return this.routes[path];
+  }
+
+  hasRoute(path) {
+    return this.routes.hasOwnProperty(path);
+  }
+
+  getPath(route) {
+    return this.paths[route];
+  }
+}
+
+// View templates
+const templates = {
+  public: {
+    login: "src/views/public/login/index",
+    validacaoCertificado: "src/views/public/validarCertificado/index",
+  },
+  private: {
+    inicio: "src/views/private/inicio/index",
+    frequencia: "src/views/private/frequencia/index",
+    certificado: "src/views/private/certificado/index",
+    pagamento: "src/views/private/pagamento/index",
+  },
+  error: {
+    404: "src/views/error/404",
+    401: "src/views/error/401",
+  },
+};
+
+const router = new Router();
+
+router.addRoute("login", templates.public.login, (request) => {
+  return HtmlService.createTemplateFromFile(templates.public.login).evaluate();
+});
+router.addRoute(
+  "validacao-certificado",
+  templates.public.validacaoCertificado,
+  (request) => {
+    return HtmlService.createTemplateFromFile(
+      templates.public.validacaoCertificado
+    ).evaluate();
+  }
+);
+router.addRoute("usercallback", null, (request) => {
+  authCallback();
+});
+
+router.addRoute(
+  "inicio",
+  templates.private.inicio,
+  () => {
+    return HtmlService.createTemplateFromFile(templates.private.inicio)
+      .evaluate()
+      .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+  },
+  true
+);
+
+router.addRoute(
+  "frequencia",
+  templates.private.frequencia,
+  (request) => {
+    return HtmlService.createTemplateFromFile(
+      templates.private.frequencia
+    ).evaluate();
+  },
+  true
+);
+
+router.addRoute(
+  "certificado",
+  templates.private.certificado,
+  (request) => {
+    return HtmlService.createTemplateFromFile(
+      templates.private.certificado
+    ).evaluate();
+  },
+  true
+);
+
+router.addRoute(
+  "pagamento",
+  templates.private.pagamento,
+  (request) => {
+    return HtmlService.createTemplateFromFile(
+      templates.private.pagamento
+    ).evaluate();
+  },
+  true
+);
+
+const requestHandler = new HttpRequestHandler(router);
+function doGet(request) {
+  return requestHandler.handleRequest(request);
+}
+
+function includeByRoute(route) {
+  routeObj = router.getRoute(route);
+  if (routeObj.isPrivate) {
+    if (!temPermissao(route)) {
+      return HtmlService.createTemplateFromFile(
+        templates.error["401"]
+      ).evaluate().getContent();
+    }
+  } 
+  return include(router.getPath(route));
+}
+function temPermissao(route) {
+  return getPermissoes().includes(route);
+}
+/*
+  router.addRoute('emissaocertificado','src/template/template_certificado', (request) => {
     var t = HtmlService.createTemplateFromFile('src/template/template_certificado');
     t.data = {
       nome: "Jean Carlos Santos Serafini de Sousa",
@@ -85,7 +216,7 @@ class Router {
     
   });
   
-  router.addRoute('frequencia','src/views/private/frequencia', (request) => {
+  router.addRoute('frequenciacomvalidacao','src/views/private/frequencia', (request) => {
     try {
       Logger.log(Session.getActiveUser().getEmail())
       const service = getOAuthService();
@@ -118,7 +249,4 @@ class Router {
     }
   });
   
-  router.addRoute('usercallback', (request) => {
-    authCallback();
-  });
-  
+*/

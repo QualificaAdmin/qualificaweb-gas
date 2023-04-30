@@ -7,24 +7,26 @@
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "abrePastaAno": () => (/* binding */ abrePastaAno),
-/* harmony export */   "abrePastaPrograma": () => (/* binding */ abrePastaPrograma),
-/* harmony export */   "abrePastaTurma": () => (/* binding */ abrePastaTurma),
+/* harmony export */   "Diretorio": () => (/* binding */ Diretorio),
 /* harmony export */   "abrePlanilhaFrequencia": () => (/* binding */ abrePlanilhaFrequencia),
 /* harmony export */   "convertePlanilhaEmJSON": () => (/* binding */ convertePlanilhaEmJSON),
 /* harmony export */   "getAnos": () => (/* binding */ getAnos),
 /* harmony export */   "getCertificado": () => (/* binding */ getCertificado),
+/* harmony export */   "getCursos": () => (/* binding */ getCursos),
+/* harmony export */   "getDisciplinas": () => (/* binding */ getDisciplinas),
 /* harmony export */   "getFrequencia": () => (/* binding */ getFrequencia),
 /* harmony export */   "getInfoCurso": () => (/* binding */ getInfoCurso),
 /* harmony export */   "getInfoTurma": () => (/* binding */ getInfoTurma),
 /* harmony export */   "getOrCreatePlanilha": () => (/* binding */ getOrCreatePlanilha),
-/* harmony export */   "getPastaBancoDeDados": () => (/* binding */ getPastaBancoDeDados),
+/* harmony export */   "getPolos": () => (/* binding */ getPolos),
 /* harmony export */   "getProgramas": () => (/* binding */ getProgramas),
 /* harmony export */   "getToken": () => (/* binding */ getToken),
 /* harmony export */   "getTurmas": () => (/* binding */ getTurmas),
 /* harmony export */   "getUserAndToken": () => (/* binding */ getUserAndToken),
 /* harmony export */   "getUserInfo": () => (/* binding */ getUserInfo),
-/* harmony export */   "setFrequencia": () => (/* binding */ setFrequencia)
+/* harmony export */   "goesDown": () => (/* binding */ goesDown),
+/* harmony export */   "setFrequencia": () => (/* binding */ setFrequencia),
+/* harmony export */   "todosDiretoriosEmJSON": () => (/* binding */ todosDiretoriosEmJSON)
 /* harmony export */ });
 function convertePlanilhaEmJSON(arquivoPlanilha) {
     const planilha = SpreadsheetApp.open(arquivoPlanilha);
@@ -42,65 +44,85 @@ function convertePlanilhaEmJSON(arquivoPlanilha) {
     const jsonString = JSON.stringify(json);
     return jsonString;
 }
-function getPastaBancoDeDados() {
-    return DriveApp.getFolderById("1WOhffBcRIfDORM5FkuvfO1v7j_bbVdHV");
+class Diretorio {
+    static abrir(pastaOrigem, nomePastaDestino) {
+        let pastas = pastaOrigem.getFoldersByName(nomePastaDestino);
+        if (pastas.hasNext()) {
+            return pastas.next();
+        }
+        else {
+            throw new Error(`Não foi possível abrir ${nomePastaDestino}!`);
+        }
+    }
+    static porCaminho(caminho) {
+        const itens = caminho.split("/");
+        const pos = itens[itens.length - 1] == "" ? itens.length - 2 : itens.length - 1;
+        let pasta = this.root;
+        for (let i = 1; i <= pos; i++) {
+            pasta = Diretorio.abrir(pasta, itens[i]);
+        }
+        return pasta;
+    }
+    static subpastasEmJson(pasta) {
+        const subpastas = pasta.getFolders();
+        let json = [];
+        while (subpastas.hasNext()) {
+            const subpasta = subpastas.next();
+            json.push(subpasta.getName());
+        }
+        return json;
+    }
 }
-function abrePastaAno(ano) {
-    const pasta = getPastaBancoDeDados();
-    let pastaAno = pasta.getFoldersByName(ano);
-    if (pastaAno.hasNext()) {
-        return pastaAno.next();
-    }
-    else {
-        throw new Error("Ano inválido");
-    }
+Diretorio.root = DriveApp.getFolderById("1WOhffBcRIfDORM5FkuvfO1v7j_bbVdHV");
+
+function todosDiretoriosEmJSON() {
+    var root = Diretorio.porCaminho("/");
+    var data = goesDown(root);
+    var json = data;
+    return json;
 }
-function getProgramas(ano) {
-    const pastasProgramas = abrePastaAno(ano).getFolders();
-    let programas = [];
-    while (pastasProgramas.hasNext()) {
-        const pasta = pastasProgramas.next();
-        programas.push(pasta.getName());
+function goesDown(node) {
+    var folders = node.getFolders();
+    var data = [];
+    while (folders.hasNext()) {
+        var folder = folders.next();
+        var folderInfo = {
+            name: folder.getName(),
+            subfolders: goesDown(folder),
+        };
+        data.push(folderInfo);
     }
-    return programas;
+    return data;
 }
-function abrePastaPrograma(ano, programa) {
-    const pasta = abrePastaAno(ano);
-    let pastaPrograma = pasta.getFoldersByName(programa);
-    if (pastaPrograma.hasNext()) {
-        return pastaPrograma.next();
-    }
-    else {
-        throw new Error("Programa inválido");
-    }
+function abrePlanilhaFrequencia(ano, polo, programa, curso, turma, disciplina) {
+    const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}/${turma}/${disciplina}`);
+    const arquivoPlanilha = getOrCreatePlanilha(pasta, "Frequência");
+    const planilha = SpreadsheetApp.open(arquivoPlanilha);
+    return planilha;
 }
 function getAnos() {
-    const pastasAnos = getPastaBancoDeDados().getFolders();
-    let anos = [];
-    while (pastasAnos.hasNext()) {
-        const pasta = pastasAnos.next();
-        anos.push(pasta.getName());
-    }
-    return anos;
+    const pasta = Diretorio.porCaminho(`/`);
+    return Diretorio.subpastasEmJson(pasta);
 }
-function getTurmas(ano, programa) {
-    const pastasTurmas = abrePastaPrograma(ano, programa).getFolders();
-    var turmas = [];
-    while (pastasTurmas.hasNext()) {
-        var pasta = pastasTurmas.next();
-        turmas.push(pasta.getName());
-    }
-    return turmas;
+function getPolos(ano) {
+    const pasta = Diretorio.porCaminho(`/${ano}`);
+    return Diretorio.subpastasEmJson(pasta);
 }
-function abrePastaTurma(ano, programa, turma) {
-    const pasta = abrePastaPrograma(ano, programa);
-    let pastaTurma = pasta.getFoldersByName(turma);
-    if (pastaTurma.hasNext()) {
-        return pastaTurma.next();
-    }
-    else {
-        throw new Error("Turma inválido");
-    }
+function getProgramas(ano, polo) {
+    const pasta = Diretorio.porCaminho(`/${ano}/${polo}`);
+    return Diretorio.subpastasEmJson(pasta);
+}
+function getCursos(ano, polo, programa) {
+    const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}`);
+    return Diretorio.subpastasEmJson(pasta);
+}
+function getTurmas(ano, polo, programa, curso) {
+    const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}`);
+    return Diretorio.subpastasEmJson(pasta);
+}
+function getDisciplinas(ano, polo, programa, curso, turma) {
+    const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}/${turma}`);
+    return Diretorio.subpastasEmJson(pasta);
 }
 function getOrCreatePlanilha(pasta, nomeArquivo) {
     var arquivos = pasta.getFilesByName(nomeArquivo);
@@ -172,7 +194,6 @@ function getUserInfo() {
             nome: people.responses[0].person.names[0].unstructuredName,
             foto: people.responses[0].person.photos[0].url,
         };
-        console.log(JSON.stringify(json));
         return json;
     }
     return null;
@@ -186,30 +207,24 @@ function getUserAndToken() {
 function getToken() {
     return ScriptApp.getOAuthToken();
 }
-function getInfoCurso(ano, programa) {
-    const pastaPrograma = abrePastaPrograma(ano, programa);
+function getInfoCurso(ano, polo, programa) {
+    const pastaPrograma = Diretorio.porCaminho(`/${ano}/${polo}/${programa}`);
     const arquivoPlanilha = getOrCreatePlanilha(pastaPrograma, "InfoCurso");
     return convertePlanilhaEmJSON(arquivoPlanilha);
 }
-function getInfoTurma(ano, programa, turma) {
-    const pastaTurma = abrePastaTurma(ano, programa, turma);
+function getInfoTurma(ano, polo, programa, curso, turma) {
+    const pastaTurma = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}/${turma}`);
     const arquivoPlanilha = getOrCreatePlanilha(pastaTurma, "InfoTurma");
     return convertePlanilhaEmJSON(arquivoPlanilha);
 }
-function abrePlanilhaFrequencia(ano, programa, turma) {
-    const pastaTurma = abrePastaTurma(ano, programa, turma);
-    const arquivoPlanilha = getOrCreatePlanilha(pastaTurma, "Frequência");
-    const planilha = SpreadsheetApp.open(arquivoPlanilha);
-    return planilha;
-}
-function getFrequencia(ano, programa, turma) {
-    const planilha = abrePlanilhaFrequencia(ano, programa, turma).getSheets()[0];
+function getFrequencia(ano, polo, programa, curso, turma, disciplina) {
+    const planilha = abrePlanilhaFrequencia(ano, polo, programa, curso, turma, disciplina).getSheets()[0];
     const matriz = planilha.getDataRange().getValues();
     const [cabecalho, ...linhas] = matriz;
     const json = linhas.map((linha) => Object.fromEntries(linha.map((valor, index) => [cabecalho[index], valor])));
     return JSON.stringify(json);
 }
-function setFrequencia(ano, programa, turma, jsonString) {
+function setFrequencia(ano, polo, programa, curso, turma, disciplina, jsonString) {
     const json = JSON.parse(jsonString);
     const diasAula = Array.from(new Set(json.map((item) => Object.keys(item.Data)).flat()));
     const matriz = [["Nome", ...diasAula]];
@@ -220,7 +235,7 @@ function setFrequencia(ano, programa, turma, jsonString) {
         });
         matriz.push(linha);
     });
-    const planilha = abrePlanilhaFrequencia(ano, programa, turma).getSheets()[0];
+    const planilha = abrePlanilhaFrequencia(ano, polo, programa, curso, turma, disciplina).getSheets()[0];
     const ultimaLinha = planilha.getLastRow();
     if (ultimaLinha > 1) {
         planilha
@@ -234,6 +249,262 @@ function setFrequencia(ano, programa, turma, jsonString) {
         return;
     }
     throw new Error("Ocorreu um problema ao salvar os dados");
+}
+
+
+/***/ }),
+/* 2 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "getPermissoes": () => (/* binding */ getPermissoes)
+/* harmony export */ });
+/* harmony import */ var _services_UsuarioServico__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(3);
+
+function getPermissoes() {
+    return new _services_UsuarioServico__WEBPACK_IMPORTED_MODULE_0__.UsuarioServico().getPermissoes(Session.getActiveUser().getEmail());
+}
+
+
+/***/ }),
+/* 3 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "UsuarioServico": () => (/* binding */ UsuarioServico)
+/* harmony export */ });
+/* harmony import */ var _repositorio_base_GrupoUsuarioRepositorio__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(4);
+/* harmony import */ var _repositorio_base_UsuarioRepositorio__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(9);
+/* harmony import */ var _ServicoBase__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(11);
+
+
+
+class UsuarioServico extends _ServicoBase__WEBPACK_IMPORTED_MODULE_2__.ServicoBase {
+    constructor() {
+        super(new _repositorio_base_UsuarioRepositorio__WEBPACK_IMPORTED_MODULE_1__.UsuarioRepositorio());
+    }
+    getAll() {
+        return this.repositorio.get();
+    }
+    getById(id) {
+        return this.repositorio.getById(id);
+    }
+    getAtivo() {
+        const ativo = this.repositorio.getById(Session.getActiveUser().getEmail());
+        return ativo;
+    }
+    getPermissoes(id) {
+        const ativo = this.repositorio.getById(id);
+        const grupo = new _repositorio_base_GrupoUsuarioRepositorio__WEBPACK_IMPORTED_MODULE_0__.GrupoUsuarioRepositorio().getById(ativo.grupo);
+        return grupo.permissoes;
+    }
+}
+
+
+/***/ }),
+/* 4 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "GrupoUsuarioRepositorio": () => (/* binding */ GrupoUsuarioRepositorio)
+/* harmony export */ });
+/* harmony import */ var _domain_base_GrupoUsuario__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(5);
+/* harmony import */ var _contexto_ContextoFirestore__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6);
+/* harmony import */ var _RepositorioBase__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(8);
+
+
+
+class GrupoUsuarioRepositorio extends _RepositorioBase__WEBPACK_IMPORTED_MODULE_2__.RepositorioBase {
+    constructor() {
+        super(new _contexto_ContextoFirestore__WEBPACK_IMPORTED_MODULE_1__.ContextoFirestore(null, "grupoUsuario"));
+    }
+    static map(obj) {
+        const parse = {
+            nome: obj.name.split("/").pop(),
+            permissoes: obj.fields.permissoes.arrayValue.length > 0
+                ? {}
+                : obj.fields.permissoes.arrayValue.values.map((value) => value.referenceValue.split("/").pop()),
+            ativo: obj.fields.ativo.booleanValue,
+        };
+        return parse;
+    }
+    get() {
+        const data = this.contexto.get();
+        const grupos = data.map((grupo) => {
+            let { nome, permissoes, ativo } = GrupoUsuarioRepositorio.map(grupo);
+            return new _domain_base_GrupoUsuario__WEBPACK_IMPORTED_MODULE_0__.GrupoUsuario(nome, permissoes, ativo);
+        });
+        return grupos;
+    }
+    getById(id) {
+        let data = this.contexto.getById(id);
+        let { nome, permissoes, ativo } = GrupoUsuarioRepositorio.map(data[0]);
+        const user = new _domain_base_GrupoUsuario__WEBPACK_IMPORTED_MODULE_0__.GrupoUsuario(nome, permissoes, ativo);
+        return user;
+    }
+}
+
+
+/***/ }),
+/* 5 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "GrupoUsuario": () => (/* binding */ GrupoUsuario)
+/* harmony export */ });
+class GrupoUsuario {
+    constructor(nome, permissoes, ativo) {
+        this.nome = nome;
+        this.permissoes = permissoes;
+        this.ativo = ativo;
+    }
+    temPermissao(nomePermissao) {
+        return this.permissoes.some((permissao) => permissao.nome == nomePermissao);
+    }
+}
+
+
+/***/ }),
+/* 6 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ContextoFirestore": () => (/* binding */ ContextoFirestore)
+/* harmony export */ });
+/* harmony import */ var _ContextoBase__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(7);
+
+class ContextoFirestore extends _ContextoBase__WEBPACK_IMPORTED_MODULE_0__.ContextoBase {
+    constructor(config = null, entity) {
+        config = config = {
+            type: "service_account",
+            project_id: "qualifica-web-383414",
+            private_key_id: "a0dbfbc63426816461ac6a722679145df166df5a",
+            private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDaGMWTeS9dKET+\n+I2W/nCSL5TJIen4Gaezdbe8+1TXHU14wLPVHKXJLb5ixL3LAG9Op1YR8Bm4xJDt\nJ4HdgTPyFzEiTwYmxTOB9/H9AJLqkGh7++mehbwT0tj/uTZJSCin+L8u8VVykD90\nsJ+q3kQJvqbT12riOJ5pGt+KswGIUshb0WjFZ3603p8vaF1bavu1RvFFFTLeW4ae\n4WRltTJ5qOmPuEi91Ub7iJP/WKibdUTV4FgWVnvHGwND7RmzAPxFjuCbvbMmRmWb\nhSl4+OG+YMPsr52Oq1MGTYPiY9RsoKMT0vpyJxjwtX4RibjIpQ+FrkYVNeQQhPFZ\n7DXKS1RNAgMBAAECggEADLDBJbQOZ5EytekLE288ks5eIzehYwcad79gtghO1xHf\nV+h986eDgGRfGLqsy4LmjHusBFuwTMzH8mYTMQB2Cr8YOWWX7J9wFZQymmo94j8N\ntrHWwHC03AIaZS48WdZvIoT/b5EUi9fCZX0V3ANWZKsZZH1l/KysOl6ZWtCl2m4m\nhvy9C+Oe2g0FXAapQd/c9lPJ38lbBZzu/CRHjUyW0D+wLv3a59jwUSTxlEOzf+x2\nO5pOh+MLZawAzovVyZMhEC/N6SBITcuFlqoSBrci4IRbzqSb20/AJ590xh8QNi1i\nfzoVzoREXs1p3m4miQV0A5YOgYeWkVfd3ybMaoEwQQKBgQD1qHjLDGbNwBI47tI1\nHcVjNKNXt/mk4Nw6shRXhtRM4u4/+8PS6SYr7/b9LFm2ylQepyiV8rb6jae+D1GQ\nW2iVz58kOJN9GiXEec2yCuevPQzAQEv0zHNiz/Yc9j/S5OhIR0DwuspLHVfF2P9f\n7lMTLnAHQdBCHwmgdW70mPKBDQKBgQDjR0N3qtlhfTfN80tndZwNOFPKF+XHSfrM\n87ym0H3hs1DZ4MufkT0T2GnzKSEHlNv4joi2cI/Q7a1DGUaK4vuEHf32EbAe3uMS\neHe9jUiXXYxQ2h30V8CJROg2HkgtuzE3+ndOY/PP/0X6J4V0U3Q8tLrlinJi+RmU\no1lld9bQQQKBgQDHeG/09/H1+ZMSVaGsbascfd5wWLvGDKvmoTjxRVLXx6CLpcQB\nWz2aibQ1KTEDwtCBP1wuPbIkSqe9JTUmkYKfusHPKH1iJLwsCHdkrYQo/9p9tPe4\nI9dBkfmW1MFIXoTaQ7lQf2vJiF8AEM50N9GPDrL6wY74UbmAaDqbNCIddQKBgHmp\nijoi4N7I8vhyRmkJkhGZl3DVPhFiTrkruE7ryJbrMFqRdS7jxng7HuwlliLC0sXJ\nNvHCa5oBwP/sJdDvFIhyraHtcgP0eEVI64AygytTzmrxd5t25gAVPODLcQPZ8szu\nbLMv2jH7inAQe+X7Tnu4m1uIsxa8Fa91icNBVWKBAoGACgflQIVOVVPj1rEedHLH\n88bu3f6MvtdDxdeIY8y6EOwNLwRvHIMvycUaYw0P3m3U5Q8z4Ik1Aunqsm0TaIDW\nRWsfsaZPdCc5nkeXP6i+f/6v4/0RUu9aYjP2hhfs3snPDq9utR12Kl4PpSaiC5bq\nLx02M3QoQ2j4ns9S5YEkHk4=\n-----END PRIVATE KEY-----\n",
+            client_email: "firestore@qualifica-web-383414.iam.gserviceaccount.com",
+            client_id: "113962947588477688686",
+            auth_uri: "https://accounts.google.com/o/oauth2/auth",
+            token_uri: "https://oauth2.googleapis.com/token",
+            auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+            client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firestore%40qualifica-web-383414.iam.gserviceaccount.com",
+        };
+        let contexto = FirestoreApp.getFirestore(config.client_email, config.private_key, config.project_id);
+        super(contexto);
+        this.entity = entity;
+    }
+    get() {
+        return this.contexto.getDocuments(this.entity);
+    }
+    getById(id) {
+        return this.contexto.getDocuments(this.entity, [id]);
+    }
+}
+
+
+/***/ }),
+/* 7 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ContextoBase": () => (/* binding */ ContextoBase)
+/* harmony export */ });
+class ContextoBase {
+    constructor(contexto) {
+        this.contexto = contexto;
+    }
+}
+
+
+/***/ }),
+/* 8 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "RepositorioBase": () => (/* binding */ RepositorioBase)
+/* harmony export */ });
+class RepositorioBase {
+    constructor(contexto) {
+        this.contexto = contexto;
+    }
+}
+
+
+/***/ }),
+/* 9 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "UsuarioRepositorio": () => (/* binding */ UsuarioRepositorio)
+/* harmony export */ });
+/* harmony import */ var _domain_base_Usuario__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(10);
+/* harmony import */ var _contexto_ContextoFirestore__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6);
+/* harmony import */ var _RepositorioBase__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(8);
+
+
+
+class UsuarioRepositorio extends _RepositorioBase__WEBPACK_IMPORTED_MODULE_2__.RepositorioBase {
+    constructor() {
+        super(new _contexto_ContextoFirestore__WEBPACK_IMPORTED_MODULE_1__.ContextoFirestore(null, "usuario"));
+    }
+    static map(obj) {
+        const parse = {
+            email: obj.name.split("/").pop(),
+            grupo: obj.fields.grupo.referenceValue.split("/").pop(),
+        };
+        return parse;
+    }
+    get() {
+        let data = this.contexto.get();
+        let users = data.map((usuario) => {
+            let { email, grupo } = UsuarioRepositorio.map(usuario);
+            return new _domain_base_Usuario__WEBPACK_IMPORTED_MODULE_0__.Usuario(email, grupo);
+        });
+        return users;
+    }
+    getById(id) {
+        let data = this.contexto.getById(id);
+        let { email, grupo } = UsuarioRepositorio.map(data[0]);
+        const user = new _domain_base_Usuario__WEBPACK_IMPORTED_MODULE_0__.Usuario(email, grupo);
+        return user;
+    }
+}
+
+
+/***/ }),
+/* 10 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Usuario": () => (/* binding */ Usuario)
+/* harmony export */ });
+class Usuario {
+    constructor(email, grupo) {
+        this.email = email;
+        this.grupo = grupo;
+    }
+}
+
+
+/***/ }),
+/* 11 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ServicoBase": () => (/* binding */ ServicoBase)
+/* harmony export */ });
+class ServicoBase {
+    constructor(repositorio) {
+        this.repositorio = repositorio;
+    }
 }
 
 
@@ -311,12 +582,13 @@ var __webpack_exports__ = {};
 (() => {
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _functions__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(1);
+/* harmony import */ var _aplication__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(2);
 
-__webpack_require__.g.getPastaBancoDeDados = _functions__WEBPACK_IMPORTED_MODULE_0__.getPastaBancoDeDados;
-__webpack_require__.g.abrePastaAno = _functions__WEBPACK_IMPORTED_MODULE_0__.abrePastaAno;
-__webpack_require__.g.abrePastaPrograma = _functions__WEBPACK_IMPORTED_MODULE_0__.abrePastaPrograma;
-__webpack_require__.g.abrePastaTurma = _functions__WEBPACK_IMPORTED_MODULE_0__.abrePastaTurma;
+
+__webpack_require__.g.getPermissoes = _aplication__WEBPACK_IMPORTED_MODULE_1__.getPermissoes;
 __webpack_require__.g.abrePlanilhaFrequencia = _functions__WEBPACK_IMPORTED_MODULE_0__.abrePlanilhaFrequencia;
+__webpack_require__.g.todosDiretoriosEmJSON = _functions__WEBPACK_IMPORTED_MODULE_0__.todosDiretoriosEmJSON;
+__webpack_require__.g.Diretorio = _functions__WEBPACK_IMPORTED_MODULE_0__.Diretorio;
 __webpack_require__.g.getOrCreatePlanilha = _functions__WEBPACK_IMPORTED_MODULE_0__.getOrCreatePlanilha;
 __webpack_require__.g.convertePlanilhaEmJSON = _functions__WEBPACK_IMPORTED_MODULE_0__.convertePlanilhaEmJSON;
 

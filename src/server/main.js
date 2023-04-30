@@ -1,21 +1,22 @@
-function doGet(request) {
-  return router.handleRequest(request);
-}
-
 function include(filename) {
-  return HtmlService
-    .createTemplateFromFile(filename)
-    .evaluate()
-    .getContent();
+  return HtmlService.createTemplateFromFile(filename).evaluate().getContent();
 }
 
-function includeByRoute(route) {
-  return HtmlService
-    .createTemplateFromFile(getRoute(route))
-    .evaluate()
-    .getContent();
+/**
+ * used to expose memebers of a namespace
+ * @param {string} namespace name
+ * @param {method} method name
+ */
+function exposeRun(namespace, method, argArray) {
+  Logger.log(argArray);
+  var func = namespace ? this[namespace][method] : this[method];
+  if (argArray && argArray.length) {
+    return func.apply(this, argArray);
+  } else {
+    return func();
+  }
 }
-
+/*
 function auth() {
   var service = getOAuthService();
   Logger.log('Authorization URL: ' + service.getAuthorizationUrl());
@@ -63,4 +64,4 @@ function authCallback(request) {
   } catch (ex) {
     Logger.log(ex)
   }
-}
+}*/

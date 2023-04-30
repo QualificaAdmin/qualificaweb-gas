@@ -1,12 +1,13 @@
 import * as functions from './functions';
+import * as aplication from './aplication';
 
-(global as any).getPastaBancoDeDados = functions.getPastaBancoDeDados;
+(global as any).getPermissoes = aplication.getPermissoes;
 
-(global as any).abrePastaAno = functions.abrePastaAno;
-(global as any).abrePastaPrograma = functions.abrePastaPrograma;
-(global as any).abrePastaTurma = functions.abrePastaTurma;
 (global as any).abrePlanilhaFrequencia = functions.abrePlanilhaFrequencia;
 
+(global as any).todosDiretoriosEmJSON = functions.todosDiretoriosEmJSON;
+
+(global as any).Diretorio = functions.Diretorio;
 //(global as any).getAnos = functions.getAnos;
 //(global as any).getProgramas = functions.getProgramas;
 //(global as any).getTurmas = functions.getTurmas;
