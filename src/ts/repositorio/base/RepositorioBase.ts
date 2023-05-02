@@ -7,6 +7,10 @@ export abstract class RepositorioBase<T> implements IRepositorio<T> {
   constructor(contexto: IContexto) {
     this.contexto = contexto;
   }
-  abstract get(): T[];
-  abstract getById(id: any): T;
+  get(): T[] {
+    throw new Error("Method not implemented.");
+  }
+  getById(id: any): T {
+    throw new Error("Method not implemented.");
+  }
 }

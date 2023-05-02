@@ -1,4 +1,4 @@
-import { IRepositorio } from "../repositorio/base/IRepositorio";
+import { IRepositorio } from "../../repositorio/base/IRepositorio";
 import { IServico } from "./IServico";
 
 export abstract class ServicoBase<T> implements IServico<T> {
@@ -6,6 +6,10 @@ export abstract class ServicoBase<T> implements IServico<T> {
   constructor(repositorio: IRepositorio<T>) {
     this.repositorio = repositorio;
   }
-  abstract getAll(): T[];
-  abstract getById(id: any): T;
+  getAll(): T[] {
+    throw new Error("Method not implemented.");
+  }
+  getById(id: any): T {
+    throw new Error("Method not implemented.");
+  }
 }

@@ -35,6 +35,7 @@
     GoogleAuthProvider,
     signInWithPopup
   } from "https://www.gstatic.com/firebasejs/9.19.1/firebase-auth.js";
+  
   const firebaseConfig = {
     apiKey: "AIzaSyBVBBsrVw7LfqpCj4NP2KlGRXqSQFmsOsU",
     authDomain: "qualifica-web-383414.firebaseapp.com",
@@ -65,6 +66,7 @@
         console.log(errorCode, errorMessage);
       });
   });
+
   onAuthStateChanged(auth, (user) => {
     if (user) {
       user
@@ -128,10 +130,7 @@
               textAlign: "left", // Text alignment i.e. left, right or center
               loader: true, // Whether to show loader or not. True by default
               loaderBg: "#9EC600", // Background color of the toast loader
-              beforeShow: function () {}, // will be triggered before the toast is shown
-              afterShown: function () {}, // will be triggered after the toat has been shown
-              beforeHide: function () {}, // will be triggered before the toast gets hidden
-              afterHidden: function () {}, // will be triggered after the toast has been hidden
+
             });
             var errorCode = error.code;
             var errorMessage = error.message;

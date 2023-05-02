@@ -21,6 +21,10 @@
         async getDisciplinas(params){
             return this.api.run('getDisciplinas',params)
         }
+        async getFrequencia(params){
+            console.log(params)
+            return this.api.run('getFrequencia',params);
+        }
         async includeByRoute(name){
             return this.api.run('includeByRoute',[name])
         }

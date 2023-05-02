@@ -8,25 +8,17 @@
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "Diretorio": () => (/* binding */ Diretorio),
+/* harmony export */   "abrePlanilhaAlunos": () => (/* binding */ abrePlanilhaAlunos),
 /* harmony export */   "abrePlanilhaFrequencia": () => (/* binding */ abrePlanilhaFrequencia),
 /* harmony export */   "convertePlanilhaEmJSON": () => (/* binding */ convertePlanilhaEmJSON),
-/* harmony export */   "getAnos": () => (/* binding */ getAnos),
+/* harmony export */   "copiaAlunosParaFrequencia": () => (/* binding */ copiaAlunosParaFrequencia),
 /* harmony export */   "getCertificado": () => (/* binding */ getCertificado),
-/* harmony export */   "getCursos": () => (/* binding */ getCursos),
-/* harmony export */   "getDisciplinas": () => (/* binding */ getDisciplinas),
 /* harmony export */   "getFrequencia": () => (/* binding */ getFrequencia),
-/* harmony export */   "getInfoCurso": () => (/* binding */ getInfoCurso),
-/* harmony export */   "getInfoTurma": () => (/* binding */ getInfoTurma),
 /* harmony export */   "getOrCreatePlanilha": () => (/* binding */ getOrCreatePlanilha),
-/* harmony export */   "getPolos": () => (/* binding */ getPolos),
-/* harmony export */   "getProgramas": () => (/* binding */ getProgramas),
 /* harmony export */   "getToken": () => (/* binding */ getToken),
-/* harmony export */   "getTurmas": () => (/* binding */ getTurmas),
 /* harmony export */   "getUserAndToken": () => (/* binding */ getUserAndToken),
 /* harmony export */   "getUserInfo": () => (/* binding */ getUserInfo),
-/* harmony export */   "goesDown": () => (/* binding */ goesDown),
-/* harmony export */   "setFrequencia": () => (/* binding */ setFrequencia),
-/* harmony export */   "todosDiretoriosEmJSON": () => (/* binding */ todosDiretoriosEmJSON)
+/* harmony export */   "setFrequencia": () => (/* binding */ setFrequencia)
 /* harmony export */ });
 function convertePlanilhaEmJSON(arquivoPlanilha) {
     const planilha = SpreadsheetApp.open(arquivoPlanilha);
@@ -45,95 +37,203 @@ function convertePlanilhaEmJSON(arquivoPlanilha) {
     return jsonString;
 }
 class Diretorio {
-    static abrir(pastaOrigem, nomePastaDestino) {
-        let pastas = pastaOrigem.getFoldersByName(nomePastaDestino);
-        if (pastas.hasNext()) {
-            return pastas.next();
+    static getFolderId(folderName) {
+        var query = "mimeType='application/vnd.google-apps.folder' and trashed=false and name='" +
+            folderName +
+            "'";
+        var options = {
+            method: "GET",
+            headers: {
+                Authorization: "Bearer " + ScriptApp.getOAuthToken(),
+            },
+        };
+        var response = UrlFetchApp.fetch("https://www.googleapis.com/drive/v3/files?q=" +
+            encodeURIComponent(query), options);
+        var result = JSON.parse(response.getContentText());
+        if (result.files.length == 0) {
+            throw new Error("Pasta não encontrada: " + folderName);
+        }
+        else {
+            return result.files[0].id;
+        }
+    }
+    static listFoldersInDirectory(parentFolderName, isId = false) {
+        var _a;
+        if (!isId)
+            parentFolderName = Diretorio.getFolderId(parentFolderName);
+        const query = (parentFolderName == "root" ? "root" : '"' + parentFolderName + '"') +
+            ' in parents and trashed = false and mimeType = "application/vnd.google-apps.folder"';
+        let folders;
+        let pageToken = null;
+        let foldersList = [];
+        do {
+            try {
+                folders = (_a = Drive.Files) === null || _a === void 0 ? void 0 : _a.list({
+                    q: query,
+                    maxResults: 100,
+                    pageToken: pageToken,
+                });
+                if (!folders || !folders.items || folders.items.length === 0) {
+                    throw new Error("Nenhuma pasta encontrada em " + parentFolderName);
+                }
+                for (let i = 0; i < folders.items.length; i++) {
+                    const folder = folders.items[i];
+                    foldersList.push({ title: folder.title, id: folder.id });
+                }
+                pageToken = folders.nextPageToken;
+            }
+            catch (err) {
+                Logger.log(err);
+                throw new Error("Arquivo não encontrado.");
+            }
+        } while (pageToken);
+        return foldersList;
+    }
+    static createFolderInsideAnother(folderName, parentFolderId) {
+        parentFolderId = Diretorio.getFolderId(parentFolderId);
+        var folder = {
+            name: folderName,
+            mimeType: "application/vnd.google-apps.folder",
+            parents: [parentFolderId],
+        };
+        var options = {
+            method: "POST",
+            headers: {
+                Authorization: "Bearer " + ScriptApp.getOAuthToken(),
+                "Content-Type": "application/json",
+            },
+            payload: JSON.stringify(folder),
+        };
+        var response = UrlFetchApp.fetch("https://www.googleapis.com/drive/v3/files", options);
+        var result = JSON.parse(response.getContentText());
+        return result.id;
+    }
+    static createFolderInRoot(folderName) {
+        folderName = "Banco de Dados";
+        var folder = {
+            name: folderName,
+            mimeType: "application/vnd.google-apps.folder",
+        };
+        var options = {
+            method: "POST",
+            headers: {
+                Authorization: "Bearer " + ScriptApp.getOAuthToken(),
+                "Content-Type": "application/json",
+            },
+            payload: JSON.stringify(folder),
+        };
+        var response = UrlFetchApp.fetch("https://www.googleapis.com/drive/v3/files", options);
+        var result = JSON.parse(response.getContentText());
+        return result.id;
+    }
+    static listRootFolders() {
+        var _a;
+        const query = '"root" in parents and trashed = false and mimeType = "application/vnd.google-apps.folder"';
+        let folders;
+        let pageToken = null;
+        let folderList = [];
+        do {
+            try {
+                folders = (_a = Drive.Files) === null || _a === void 0 ? void 0 : _a.list({
+                    q: query,
+                    maxResults: 100,
+                    pageToken: pageToken,
+                });
+                if (!folders || !folders.items || folders.items.length === 0) {
+                    throw new Error("No folders found.");
+                }
+                for (let i = 0; i < folders.items.length; i++) {
+                    const folder = folders.items[i];
+                    folderList.push({ title: folder.title, id: folder.id });
+                }
+                pageToken = folders.nextPageToken;
+            }
+            catch (err) {
+                throw new Error(err.message);
+            }
+        } while (pageToken);
+        return folderList;
+    }
+    static abrir(pastaOrigem, nomePastaDestino, subpastas = true) {
+        let pastas = pastaOrigem.filter((x) => x.title == nomePastaDestino);
+        if (pastas.length > 0 && pastas[0].id) {
+            if (!subpastas)
+                return pastas[0];
+            else
+                return Diretorio.listFoldersInDirectory(pastas[0].id, true);
         }
         else {
             throw new Error(`Não foi possível abrir ${nomePastaDestino}!`);
         }
     }
-    static porCaminho(caminho) {
+    static porCaminho(caminho, subpastas = true) {
         const itens = caminho.split("/");
         const pos = itens[itens.length - 1] == "" ? itens.length - 2 : itens.length - 1;
-        let pasta = this.root;
+        let pasta = Diretorio.abrir(Diretorio.root, "Banco de Dados");
         for (let i = 1; i <= pos; i++) {
-            pasta = Diretorio.abrir(pasta, itens[i]);
+            if (!subpastas && i == pos)
+                pasta = Diretorio.abrir(pasta, itens[i], false);
+            else
+                pasta = Diretorio.abrir(pasta, itens[i]);
         }
         return pasta;
     }
     static subpastasEmJson(pasta) {
-        const subpastas = pasta.getFolders();
+        const subpastas = pasta;
         let json = [];
-        while (subpastas.hasNext()) {
-            const subpasta = subpastas.next();
-            json.push(subpasta.getName());
-        }
+        subpastas.forEach((subpasta) => {
+            if (subpasta.title)
+                json.push(subpasta.title);
+        });
         return json;
     }
 }
-Diretorio.root = DriveApp.getFolderById("1WOhffBcRIfDORM5FkuvfO1v7j_bbVdHV");
+Diretorio.root = Diretorio.listRootFolders();
 
-function todosDiretoriosEmJSON() {
-    var root = Diretorio.porCaminho("/");
-    var data = goesDown(root);
-    var json = data;
-    return json;
-}
-function goesDown(node) {
-    var folders = node.getFolders();
-    var data = [];
-    while (folders.hasNext()) {
-        var folder = folders.next();
-        var folderInfo = {
-            name: folder.getName(),
-            subfolders: goesDown(folder),
-        };
-        data.push(folderInfo);
-    }
-    return data;
-}
 function abrePlanilhaFrequencia(ano, polo, programa, curso, turma, disciplina) {
-    const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}/${turma}/${disciplina}`);
-    const arquivoPlanilha = getOrCreatePlanilha(pasta, "Frequência");
-    const planilha = SpreadsheetApp.open(arquivoPlanilha);
+    const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}/${turma}/${disciplina}`, false);
+    const urlPlanilha = getOrCreatePlanilha(pasta, "Frequência");
+    const planilha = SpreadsheetApp.openByUrl(urlPlanilha);
     return planilha;
 }
-function getAnos() {
-    const pasta = Diretorio.porCaminho(`/`);
-    return Diretorio.subpastasEmJson(pasta);
-}
-function getPolos(ano) {
-    const pasta = Diretorio.porCaminho(`/${ano}`);
-    return Diretorio.subpastasEmJson(pasta);
-}
-function getProgramas(ano, polo) {
-    const pasta = Diretorio.porCaminho(`/${ano}/${polo}`);
-    return Diretorio.subpastasEmJson(pasta);
-}
-function getCursos(ano, polo, programa) {
-    const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}`);
-    return Diretorio.subpastasEmJson(pasta);
-}
-function getTurmas(ano, polo, programa, curso) {
-    const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}`);
-    return Diretorio.subpastasEmJson(pasta);
-}
-function getDisciplinas(ano, polo, programa, curso, turma) {
-    const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}/${turma}`);
-    return Diretorio.subpastasEmJson(pasta);
+function abrePlanilhaAlunos(ano, polo, programa, curso, turma) {
+    const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}/${turma}`, false);
+    const urlPlanilha = getOrCreatePlanilha(pasta, "Alunos");
+    const planilha = SpreadsheetApp.openByUrl(urlPlanilha);
+    return planilha;
 }
 function getOrCreatePlanilha(pasta, nomeArquivo) {
-    var arquivos = pasta.getFilesByName(nomeArquivo);
-    if (arquivos.hasNext()) {
-        return arquivos.next();
+    const pastaId = pasta.id;
+    const accessToken = ScriptApp.getOAuthToken();
+    const url = `https://www.googleapis.com/drive/v3/files?q=name='${nomeArquivo}'+and+mimeType='application/vnd.google-apps.spreadsheet'+and+trashed=false+and+'${pastaId}'+in+parents&fields=files(id,name,mimeType,parents,webViewLink)`;
+    const headers = { Authorization: `Bearer ${accessToken}` };
+    const params = {
+        headers: headers,
+        method: 'GET',
+        contentType: 'application/json',
+        muteHttpExceptions: true
+    };
+    const response = UrlFetchApp.fetch(url, params);
+    const files = JSON.parse(response.getContentText()).files;
+    if (files.length > 0) {
+        console.log(files[0]);
+        return files[0].webViewLink;
     }
-    else {
-        var planilha = SpreadsheetApp.create(nomeArquivo);
-        DriveApp.getFileById(planilha.getId()).moveTo(pasta);
-        return pasta.getFilesByName(nomeArquivo).next();
-    }
+    const metadata = {
+        name: nomeArquivo,
+        parents: [pastaId],
+        mimeType: 'application/vnd.google-apps.spreadsheet'
+    };
+    const options = {
+        headers: headers,
+        method: 'POST',
+        contentType: 'application/json',
+        payload: JSON.stringify(metadata),
+        muteHttpExceptions: true
+    };
+    const fileResponse = UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files', options);
+    const newFile = JSON.parse(fileResponse.getContentText());
+    return newFile.webViewLink;
 }
 function getCertificado(data) {
     data = {
@@ -207,17 +307,21 @@ function getUserAndToken() {
 function getToken() {
     return ScriptApp.getOAuthToken();
 }
-function getInfoCurso(ano, polo, programa) {
-    const pastaPrograma = Diretorio.porCaminho(`/${ano}/${polo}/${programa}`);
-    const arquivoPlanilha = getOrCreatePlanilha(pastaPrograma, "InfoCurso");
-    return convertePlanilhaEmJSON(arquivoPlanilha);
-}
-function getInfoTurma(ano, polo, programa, curso, turma) {
-    const pastaTurma = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}/${turma}`);
-    const arquivoPlanilha = getOrCreatePlanilha(pastaTurma, "InfoTurma");
-    return convertePlanilhaEmJSON(arquivoPlanilha);
+function copiaAlunosParaFrequencia(ano, polo, programa, curso, turma) {
+    const planilhaAluno = abrePlanilhaAlunos(ano, polo, programa, curso, turma).getSheets()[0];
+    const alunos = planilhaAluno.getRange("A:A").getValues();
+    const disciplinas = getDisciplinas(ano, polo, programa, curso, turma);
+    disciplinas.forEach((disciplina) => {
+        const planilhaDisciplina = abrePlanilhaFrequencia(ano, polo, programa, curso, turma, disciplina).getSheets()[0];
+        const transposedAlunos = alunos.map((aluno) => [aluno[0]]);
+        console.log(planilhaDisciplina.getName());
+        planilhaDisciplina
+            .getRange(1, 1, alunos.length, 1)
+            .setValues(transposedAlunos);
+    });
 }
 function getFrequencia(ano, polo, programa, curso, turma, disciplina) {
+    copiaAlunosParaFrequencia(ano, polo, programa, curso, turma);
     const planilha = abrePlanilhaFrequencia(ano, polo, programa, curso, turma, disciplina).getSheets()[0];
     const matriz = planilha.getDataRange().getValues();
     const [cabecalho, ...linhas] = matriz;
@@ -258,12 +362,18 @@ function setFrequencia(ano, polo, programa, curso, turma, disciplina, jsonString
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "getAnosFirebase": () => (/* binding */ getAnosFirebase),
 /* harmony export */   "getPermissoes": () => (/* binding */ getPermissoes)
 /* harmony export */ });
-/* harmony import */ var _services_UsuarioServico__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(3);
+/* harmony import */ var _services_academico_AnoServico__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(3);
+/* harmony import */ var _services_base_UsuarioServico__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(10);
 
+
+function getAnosFirebase() {
+    return new _services_academico_AnoServico__WEBPACK_IMPORTED_MODULE_0__.AnoServico().getAll();
+}
 function getPermissoes() {
-    return new _services_UsuarioServico__WEBPACK_IMPORTED_MODULE_0__.UsuarioServico().getPermissoes(Session.getActiveUser().getEmail());
+    return new _services_base_UsuarioServico__WEBPACK_IMPORTED_MODULE_1__.UsuarioServico().getPermissoes(Session.getActiveUser().getEmail());
 }
 
 
@@ -273,11 +383,191 @@ function getPermissoes() {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "AnoServico": () => (/* binding */ AnoServico)
+/* harmony export */ });
+/* harmony import */ var _repositorio_academico_AnoRepositorio__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(4);
+/* harmony import */ var _base_ServicoBase__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(9);
+
+
+class AnoServico extends _base_ServicoBase__WEBPACK_IMPORTED_MODULE_1__.ServicoBase {
+    constructor() {
+        super(new _repositorio_academico_AnoRepositorio__WEBPACK_IMPORTED_MODULE_0__.AnoRepositorio());
+    }
+    getAll() {
+        return this.repositorio.get();
+    }
+    getById(id) {
+        return this.repositorio.getById(id);
+    }
+}
+
+
+/***/ }),
+/* 4 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "AnoRepositorio": () => (/* binding */ AnoRepositorio)
+/* harmony export */ });
+/* harmony import */ var _domain_academico_Ano__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(5);
+/* harmony import */ var _contexto_ContextoFirestore__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6);
+/* harmony import */ var _base_RepositorioBase__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(8);
+
+
+
+class AnoRepositorio extends _base_RepositorioBase__WEBPACK_IMPORTED_MODULE_2__.RepositorioBase {
+    constructor() {
+        super(new _contexto_ContextoFirestore__WEBPACK_IMPORTED_MODULE_1__.ContextoFirestore(null, "ano"));
+    }
+    static map(obj) {
+        const parse = {
+            ano: obj.name.split("/").pop(),
+        };
+        return parse;
+    }
+    get() {
+        const data = this.contexto.get();
+        const grupos = data.map((grupo) => {
+            let { ano } = AnoRepositorio.map(grupo);
+            return new _domain_academico_Ano__WEBPACK_IMPORTED_MODULE_0__.Ano(ano);
+        });
+        return grupos;
+    }
+    getById(id) {
+        let data = this.contexto.getById(id);
+        let { ano } = AnoRepositorio.map(data[0]);
+        const user = new _domain_academico_Ano__WEBPACK_IMPORTED_MODULE_0__.Ano(ano);
+        return user;
+    }
+}
+
+
+/***/ }),
+/* 5 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Ano": () => (/* binding */ Ano)
+/* harmony export */ });
+class Ano {
+    constructor(ano) {
+        this.ano = ano;
+    }
+}
+
+
+/***/ }),
+/* 6 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ContextoFirestore": () => (/* binding */ ContextoFirestore)
+/* harmony export */ });
+/* harmony import */ var _ContextoBase__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(7);
+
+class ContextoFirestore extends _ContextoBase__WEBPACK_IMPORTED_MODULE_0__.ContextoBase {
+    constructor(config = null, entity) {
+        config = config = {
+            type: "service_account",
+            project_id: "qualifica-web-383414",
+            private_key_id: "a0dbfbc63426816461ac6a722679145df166df5a",
+            private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDaGMWTeS9dKET+\n+I2W/nCSL5TJIen4Gaezdbe8+1TXHU14wLPVHKXJLb5ixL3LAG9Op1YR8Bm4xJDt\nJ4HdgTPyFzEiTwYmxTOB9/H9AJLqkGh7++mehbwT0tj/uTZJSCin+L8u8VVykD90\nsJ+q3kQJvqbT12riOJ5pGt+KswGIUshb0WjFZ3603p8vaF1bavu1RvFFFTLeW4ae\n4WRltTJ5qOmPuEi91Ub7iJP/WKibdUTV4FgWVnvHGwND7RmzAPxFjuCbvbMmRmWb\nhSl4+OG+YMPsr52Oq1MGTYPiY9RsoKMT0vpyJxjwtX4RibjIpQ+FrkYVNeQQhPFZ\n7DXKS1RNAgMBAAECggEADLDBJbQOZ5EytekLE288ks5eIzehYwcad79gtghO1xHf\nV+h986eDgGRfGLqsy4LmjHusBFuwTMzH8mYTMQB2Cr8YOWWX7J9wFZQymmo94j8N\ntrHWwHC03AIaZS48WdZvIoT/b5EUi9fCZX0V3ANWZKsZZH1l/KysOl6ZWtCl2m4m\nhvy9C+Oe2g0FXAapQd/c9lPJ38lbBZzu/CRHjUyW0D+wLv3a59jwUSTxlEOzf+x2\nO5pOh+MLZawAzovVyZMhEC/N6SBITcuFlqoSBrci4IRbzqSb20/AJ590xh8QNi1i\nfzoVzoREXs1p3m4miQV0A5YOgYeWkVfd3ybMaoEwQQKBgQD1qHjLDGbNwBI47tI1\nHcVjNKNXt/mk4Nw6shRXhtRM4u4/+8PS6SYr7/b9LFm2ylQepyiV8rb6jae+D1GQ\nW2iVz58kOJN9GiXEec2yCuevPQzAQEv0zHNiz/Yc9j/S5OhIR0DwuspLHVfF2P9f\n7lMTLnAHQdBCHwmgdW70mPKBDQKBgQDjR0N3qtlhfTfN80tndZwNOFPKF+XHSfrM\n87ym0H3hs1DZ4MufkT0T2GnzKSEHlNv4joi2cI/Q7a1DGUaK4vuEHf32EbAe3uMS\neHe9jUiXXYxQ2h30V8CJROg2HkgtuzE3+ndOY/PP/0X6J4V0U3Q8tLrlinJi+RmU\no1lld9bQQQKBgQDHeG/09/H1+ZMSVaGsbascfd5wWLvGDKvmoTjxRVLXx6CLpcQB\nWz2aibQ1KTEDwtCBP1wuPbIkSqe9JTUmkYKfusHPKH1iJLwsCHdkrYQo/9p9tPe4\nI9dBkfmW1MFIXoTaQ7lQf2vJiF8AEM50N9GPDrL6wY74UbmAaDqbNCIddQKBgHmp\nijoi4N7I8vhyRmkJkhGZl3DVPhFiTrkruE7ryJbrMFqRdS7jxng7HuwlliLC0sXJ\nNvHCa5oBwP/sJdDvFIhyraHtcgP0eEVI64AygytTzmrxd5t25gAVPODLcQPZ8szu\nbLMv2jH7inAQe+X7Tnu4m1uIsxa8Fa91icNBVWKBAoGACgflQIVOVVPj1rEedHLH\n88bu3f6MvtdDxdeIY8y6EOwNLwRvHIMvycUaYw0P3m3U5Q8z4Ik1Aunqsm0TaIDW\nRWsfsaZPdCc5nkeXP6i+f/6v4/0RUu9aYjP2hhfs3snPDq9utR12Kl4PpSaiC5bq\nLx02M3QoQ2j4ns9S5YEkHk4=\n-----END PRIVATE KEY-----\n",
+            client_email: "firestore@qualifica-web-383414.iam.gserviceaccount.com",
+            client_id: "113962947588477688686",
+            auth_uri: "https://accounts.google.com/o/oauth2/auth",
+            token_uri: "https://oauth2.googleapis.com/token",
+            auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+            client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firestore%40qualifica-web-383414.iam.gserviceaccount.com",
+        };
+        let contexto = FirestoreApp.getFirestore(config.client_email, config.private_key, config.project_id);
+        super(contexto);
+        this.entity = entity;
+        this.base = 'projects/qualifica-web-383414/databases/(default)/documents/';
+    }
+    get() {
+        return this.contexto.getDocuments(this.entity);
+    }
+    getById(id) {
+        return this.contexto.getDocuments(this.entity, [id]);
+    }
+    getReference(ref) {
+        const reference = ref.split(this.base)[1];
+        return this.contexto.getDocument(reference);
+    }
+}
+
+
+/***/ }),
+/* 7 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ContextoBase": () => (/* binding */ ContextoBase)
+/* harmony export */ });
+class ContextoBase {
+    constructor(contexto) {
+        this.contexto = contexto;
+    }
+}
+
+
+/***/ }),
+/* 8 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "RepositorioBase": () => (/* binding */ RepositorioBase)
+/* harmony export */ });
+class RepositorioBase {
+    constructor(contexto) {
+        this.contexto = contexto;
+    }
+    get() {
+        throw new Error("Method not implemented.");
+    }
+    getById(id) {
+        throw new Error("Method not implemented.");
+    }
+}
+
+
+/***/ }),
+/* 9 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ServicoBase": () => (/* binding */ ServicoBase)
+/* harmony export */ });
+class ServicoBase {
+    constructor(repositorio) {
+        this.repositorio = repositorio;
+    }
+    getAll() {
+        throw new Error("Method not implemented.");
+    }
+    getById(id) {
+        throw new Error("Method not implemented.");
+    }
+}
+
+
+/***/ }),
+/* 10 */
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "UsuarioServico": () => (/* binding */ UsuarioServico)
 /* harmony export */ });
-/* harmony import */ var _repositorio_base_GrupoUsuarioRepositorio__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(4);
-/* harmony import */ var _repositorio_base_UsuarioRepositorio__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(9);
-/* harmony import */ var _ServicoBase__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(11);
+/* harmony import */ var _repositorio_base_GrupoUsuarioRepositorio__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(11);
+/* harmony import */ var _repositorio_base_UsuarioRepositorio__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(13);
+/* harmony import */ var _ServicoBase__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(9);
 
 
 
@@ -304,14 +594,14 @@ class UsuarioServico extends _ServicoBase__WEBPACK_IMPORTED_MODULE_2__.ServicoBa
 
 
 /***/ }),
-/* 4 */
+/* 11 */
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "GrupoUsuarioRepositorio": () => (/* binding */ GrupoUsuarioRepositorio)
 /* harmony export */ });
-/* harmony import */ var _domain_base_GrupoUsuario__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(5);
+/* harmony import */ var _domain_base_GrupoUsuario__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(12);
 /* harmony import */ var _contexto_ContextoFirestore__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6);
 /* harmony import */ var _RepositorioBase__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(8);
 
@@ -349,7 +639,7 @@ class GrupoUsuarioRepositorio extends _RepositorioBase__WEBPACK_IMPORTED_MODULE_
 
 
 /***/ }),
-/* 5 */
+/* 12 */
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -369,81 +659,14 @@ class GrupoUsuario {
 
 
 /***/ }),
-/* 6 */
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "ContextoFirestore": () => (/* binding */ ContextoFirestore)
-/* harmony export */ });
-/* harmony import */ var _ContextoBase__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(7);
-
-class ContextoFirestore extends _ContextoBase__WEBPACK_IMPORTED_MODULE_0__.ContextoBase {
-    constructor(config = null, entity) {
-        config = config = {
-            type: "service_account",
-            project_id: "qualifica-web-383414",
-            private_key_id: "a0dbfbc63426816461ac6a722679145df166df5a",
-            private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDaGMWTeS9dKET+\n+I2W/nCSL5TJIen4Gaezdbe8+1TXHU14wLPVHKXJLb5ixL3LAG9Op1YR8Bm4xJDt\nJ4HdgTPyFzEiTwYmxTOB9/H9AJLqkGh7++mehbwT0tj/uTZJSCin+L8u8VVykD90\nsJ+q3kQJvqbT12riOJ5pGt+KswGIUshb0WjFZ3603p8vaF1bavu1RvFFFTLeW4ae\n4WRltTJ5qOmPuEi91Ub7iJP/WKibdUTV4FgWVnvHGwND7RmzAPxFjuCbvbMmRmWb\nhSl4+OG+YMPsr52Oq1MGTYPiY9RsoKMT0vpyJxjwtX4RibjIpQ+FrkYVNeQQhPFZ\n7DXKS1RNAgMBAAECggEADLDBJbQOZ5EytekLE288ks5eIzehYwcad79gtghO1xHf\nV+h986eDgGRfGLqsy4LmjHusBFuwTMzH8mYTMQB2Cr8YOWWX7J9wFZQymmo94j8N\ntrHWwHC03AIaZS48WdZvIoT/b5EUi9fCZX0V3ANWZKsZZH1l/KysOl6ZWtCl2m4m\nhvy9C+Oe2g0FXAapQd/c9lPJ38lbBZzu/CRHjUyW0D+wLv3a59jwUSTxlEOzf+x2\nO5pOh+MLZawAzovVyZMhEC/N6SBITcuFlqoSBrci4IRbzqSb20/AJ590xh8QNi1i\nfzoVzoREXs1p3m4miQV0A5YOgYeWkVfd3ybMaoEwQQKBgQD1qHjLDGbNwBI47tI1\nHcVjNKNXt/mk4Nw6shRXhtRM4u4/+8PS6SYr7/b9LFm2ylQepyiV8rb6jae+D1GQ\nW2iVz58kOJN9GiXEec2yCuevPQzAQEv0zHNiz/Yc9j/S5OhIR0DwuspLHVfF2P9f\n7lMTLnAHQdBCHwmgdW70mPKBDQKBgQDjR0N3qtlhfTfN80tndZwNOFPKF+XHSfrM\n87ym0H3hs1DZ4MufkT0T2GnzKSEHlNv4joi2cI/Q7a1DGUaK4vuEHf32EbAe3uMS\neHe9jUiXXYxQ2h30V8CJROg2HkgtuzE3+ndOY/PP/0X6J4V0U3Q8tLrlinJi+RmU\no1lld9bQQQKBgQDHeG/09/H1+ZMSVaGsbascfd5wWLvGDKvmoTjxRVLXx6CLpcQB\nWz2aibQ1KTEDwtCBP1wuPbIkSqe9JTUmkYKfusHPKH1iJLwsCHdkrYQo/9p9tPe4\nI9dBkfmW1MFIXoTaQ7lQf2vJiF8AEM50N9GPDrL6wY74UbmAaDqbNCIddQKBgHmp\nijoi4N7I8vhyRmkJkhGZl3DVPhFiTrkruE7ryJbrMFqRdS7jxng7HuwlliLC0sXJ\nNvHCa5oBwP/sJdDvFIhyraHtcgP0eEVI64AygytTzmrxd5t25gAVPODLcQPZ8szu\nbLMv2jH7inAQe+X7Tnu4m1uIsxa8Fa91icNBVWKBAoGACgflQIVOVVPj1rEedHLH\n88bu3f6MvtdDxdeIY8y6EOwNLwRvHIMvycUaYw0P3m3U5Q8z4Ik1Aunqsm0TaIDW\nRWsfsaZPdCc5nkeXP6i+f/6v4/0RUu9aYjP2hhfs3snPDq9utR12Kl4PpSaiC5bq\nLx02M3QoQ2j4ns9S5YEkHk4=\n-----END PRIVATE KEY-----\n",
-            client_email: "firestore@qualifica-web-383414.iam.gserviceaccount.com",
-            client_id: "113962947588477688686",
-            auth_uri: "https://accounts.google.com/o/oauth2/auth",
-            token_uri: "https://oauth2.googleapis.com/token",
-            auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-            client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firestore%40qualifica-web-383414.iam.gserviceaccount.com",
-        };
-        let contexto = FirestoreApp.getFirestore(config.client_email, config.private_key, config.project_id);
-        super(contexto);
-        this.entity = entity;
-    }
-    get() {
-        return this.contexto.getDocuments(this.entity);
-    }
-    getById(id) {
-        return this.contexto.getDocuments(this.entity, [id]);
-    }
-}
-
-
-/***/ }),
-/* 7 */
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "ContextoBase": () => (/* binding */ ContextoBase)
-/* harmony export */ });
-class ContextoBase {
-    constructor(contexto) {
-        this.contexto = contexto;
-    }
-}
-
-
-/***/ }),
-/* 8 */
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "RepositorioBase": () => (/* binding */ RepositorioBase)
-/* harmony export */ });
-class RepositorioBase {
-    constructor(contexto) {
-        this.contexto = contexto;
-    }
-}
-
-
-/***/ }),
-/* 9 */
+/* 13 */
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "UsuarioRepositorio": () => (/* binding */ UsuarioRepositorio)
 /* harmony export */ });
-/* harmony import */ var _domain_base_Usuario__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(10);
+/* harmony import */ var _domain_base_Usuario__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(14);
 /* harmony import */ var _contexto_ContextoFirestore__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6);
 /* harmony import */ var _RepositorioBase__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(8);
 
@@ -478,7 +701,7 @@ class UsuarioRepositorio extends _RepositorioBase__WEBPACK_IMPORTED_MODULE_2__.R
 
 
 /***/ }),
-/* 10 */
+/* 14 */
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -489,21 +712,6 @@ class Usuario {
     constructor(email, grupo) {
         this.email = email;
         this.grupo = grupo;
-    }
-}
-
-
-/***/ }),
-/* 11 */
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "ServicoBase": () => (/* binding */ ServicoBase)
-/* harmony export */ });
-class ServicoBase {
-    constructor(repositorio) {
-        this.repositorio = repositorio;
     }
 }
 
@@ -586,8 +794,9 @@ __webpack_require__.r(__webpack_exports__);
 
 
 __webpack_require__.g.getPermissoes = _aplication__WEBPACK_IMPORTED_MODULE_1__.getPermissoes;
+__webpack_require__.g.getAnosFirebase = _aplication__WEBPACK_IMPORTED_MODULE_1__.getAnosFirebase;
 __webpack_require__.g.abrePlanilhaFrequencia = _functions__WEBPACK_IMPORTED_MODULE_0__.abrePlanilhaFrequencia;
-__webpack_require__.g.todosDiretoriosEmJSON = _functions__WEBPACK_IMPORTED_MODULE_0__.todosDiretoriosEmJSON;
+__webpack_require__.g.copiaAlunosParaFrequencia = _functions__WEBPACK_IMPORTED_MODULE_0__.copiaAlunosParaFrequencia;
 __webpack_require__.g.Diretorio = _functions__WEBPACK_IMPORTED_MODULE_0__.Diretorio;
 __webpack_require__.g.getOrCreatePlanilha = _functions__WEBPACK_IMPORTED_MODULE_0__.getOrCreatePlanilha;
 __webpack_require__.g.convertePlanilhaEmJSON = _functions__WEBPACK_IMPORTED_MODULE_0__.convertePlanilhaEmJSON;

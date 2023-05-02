@@ -16,7 +16,6 @@ function getUserInfo() {
 function getData(){
   const json = {
     user:getUserInfo(),
-    dropdowns:todosDiretoriosEmJSON()
   }
   return json;
 }
@@ -83,6 +82,7 @@ function getInfoTurma(ano, programa, turma) {
 }
 
 function getFrequencia(ano, polo, programa, curso, turma, disciplina) {
+  copiaAlunosParaFrequencia(ano, polo, programa, curso, turma);
   const planilha = abrePlanilhaFrequencia(ano, polo, programa, curso, turma, disciplina).getSheets()[0];
   const matriz = planilha.getDataRange().getValues();
   const [cabecalho, ...linhas] = matriz;

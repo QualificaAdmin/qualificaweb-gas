@@ -1,4 +1,4 @@
-import { IRepositorio } from "../repositorio/base/IRepositorio";
+import { IRepositorio } from "../../repositorio/base/IRepositorio";
 
 export declare interface IServico<T>{
     repositorio:IRepositorio<T>;

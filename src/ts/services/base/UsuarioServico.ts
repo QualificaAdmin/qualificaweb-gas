@@ -1,6 +1,6 @@
-import { Usuario } from "../domain/base/Usuario";
-import { GrupoUsuarioRepositorio } from "../repositorio/base/GrupoUsuarioRepositorio";
-import { UsuarioRepositorio } from "../repositorio/base/UsuarioRepositorio";
+import { Usuario } from "../../domain/base/Usuario";
+import { GrupoUsuarioRepositorio } from "../../repositorio/base/GrupoUsuarioRepositorio";
+import { UsuarioRepositorio } from "../../repositorio/base/UsuarioRepositorio";
 import { ServicoBase } from "./ServicoBase";
 
 export class UsuarioServico extends ServicoBase<Usuario> {

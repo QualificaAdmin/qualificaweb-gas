@@ -1,10 +1,6 @@
-import { ContextoBase } from "./ContextoBase";
+function myFunction() {
 
-export class ContextoFirestore extends ContextoBase {
-  config: any;
-  entity: string;
-  base:string;
-  constructor(config: any = null, entity: string) {
+
     config = config = {
       type: "service_account",
       project_id: "qualifica-web-383414",
@@ -25,18 +21,8 @@ export class ContextoFirestore extends ContextoBase {
       config.private_key,
       config.project_id
     );
-    super(contexto);
-    this.entity = entity;
-    this.base='projects/qualifica-web-383414/databases/(default)/documents/';
+    const ano = '2023';
+    let result=contexto.getDocuments(`ano/${ano}/polo`)
+    console.log(result)
   }
-  get(): any[] {
-    return this.contexto.getDocuments(this.entity);
-  }
-  getById(id: string): any {
-    return this.contexto.getDocuments(this.entity, [id]);
-  }
-  getReference(ref:any):any{
-   const reference = ref.split(this.base)[1];
-   return this.contexto.getDocument(reference)
-  }
-}
+  

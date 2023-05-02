@@ -146,6 +146,7 @@ router.addRoute(
 
 const requestHandler = new HttpRequestHandler(router);
 function doGet(request) {
+  CacheService.getUserCache().put('permissoes',getPermissoes())
   return requestHandler.handleRequest(request);
 }
 
@@ -153,15 +154,73 @@ function includeByRoute(route) {
   routeObj = router.getRoute(route);
   if (routeObj.isPrivate) {
     if (!temPermissao(route)) {
-      return HtmlService.createTemplateFromFile(
-        templates.error["401"]
-      ).evaluate().getContent();
+      return HtmlService.createTemplateFromFile(templates.error["401"])
+        .evaluate()
+        .getContent();
     }
-  } 
+  }
   return include(router.getPath(route));
 }
+function getMenu() {
+  const permissoes =  CacheService.getUserCache().get('permissoes')
+  const menuItens = [
+    {
+      title: "Dashboard",
+      iconClass: "fas fa-fw fa-tachometer-alt",
+      link: "inicio",
+      active: true,
+    },
+    {
+      title: "Acadêmico",
+      iconClass: "fas fa-fw fa-book",
+      submenu: [
+        {
+          title:"Calendário",
+          link:"calendario",
+        },
+        {
+          title:"Turma",
+          link:"turma",
+        },
+        {
+          title: "Frequência",
+          link: "frequencia",
+        },
+        {
+          title: "Certificado",
+          link: "certificado",
+        },
+        {
+          title: "Pagamento",
+          link: "pagamento",
+        },
+      ],
+    },
+    {
+      title: "Validar Certificado",
+      iconClass: "fas fa-fw fa-folder",
+      submenu: [],
+    },
+  ];
+  const filteredMenu = menuItens.filter(menuItem => {
+    if (menuItem.submenu) {
+      const filteredSubmenu = menuItem.submenu.filter(submenuItem => {
+        return permissoes.includes(submenuItem.link);
+      });
+      if (filteredSubmenu.length > 0) {
+        menuItem.submenu = filteredSubmenu;
+        return true;
+      }
+    } else {
+      return permissoes.includes(menuItem.link);
+    }
+  });
+  return filteredMenu;
+}
+
 function temPermissao(route) {
-  return getPermissoes().includes(route);
+  const permissoes =  CacheService.getUserCache().get('permissoes')
+  return permissoes.includes(route);
 }
 /*
   router.addRoute('emissaocertificado','src/template/template_certificado', (request) => {

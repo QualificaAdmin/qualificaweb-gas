@@ -44,7 +44,6 @@
     this.loadScreen = async (name) => {
       $.LoadingOverlay("show");
       try {
-        const page = await baseService.includeByRoute(name);
         const setInnerHTML = (elm, html) => {
           elm.innerHTML = html;
           Array.from(elm.querySelectorAll("script")).forEach((oldScriptEl) => {
@@ -57,11 +56,21 @@
             oldScriptEl.parentNode.replaceChild(newScriptEl, oldScriptEl);
           });
         };
-        setInnerHTML(document.getElementById("page"), page);
-        telaAtual = name;
+        if (name == "inicio") {
+          telaAtual = "inicio";
+          setInnerHTML(document.getElementById("page"), "");
+        } else {
+          const page = await baseService.includeByRoute(name);
+          setInnerHTML(document.getElementById("page"), page);
+          telaAtual = name;
+        }
       } catch (ex) {
         console.error(ex);
-        this.toast("Erro", "Ocorreu um problema ao abrir a tela.", this.icon.error);
+        this.toast(
+          "Erro",
+          "Ocorreu um problema ao abrir a tela.",
+          this.icon.error
+        );
         document.getElementById("page").innerHTML = "";
         telaAtual = null;
       } finally {
@@ -132,27 +141,18 @@
 </script>
 <script>
   async function montaMenu(menuItems) {
-    // Define the menu items as an array of objects
-
-    // Find the sidebar element
     const sidebar = document.querySelector("#accordionSidebar");
-
-    // Loop through the menu items and create the corresponding HTML elements
     for (let item of menuItems) {
-      // Create a new list item
       const li = document.createElement("li");
       li.classList.add("nav-item");
 
-      // If the item is active, add the "active" class to the list item
       if (item.active) {
         li.classList.add("active");
       }
 
-      // Create a link for the list item
       const link = document.createElement("a");
       link.classList.add("nav-link");
 
-      // If the item has a submenu, add the "collapsed" class to the link
       if (item.submenu && item.submenu.length > 0) {
         link.classList.add("collapsed");
         link.setAttribute("data-toggle", "collapse");
@@ -166,27 +166,17 @@
         });
       }
 
-      // Create the icon element
       const icon = document.createElement("i");
       icon.classList.add(...item.iconClass.split(" "));
       link.appendChild(icon);
-
-      // Create the title element
       const title = document.createElement("span");
       title.innerText = item.title;
       link.appendChild(title);
-
-      // Append the link to the list item
       li.appendChild(link);
-
-      // If the item has a submenu, create the corresponding HTML elements
       if (item.submenu && item.submenu.length > 0) {
-        // Create a div for the submenu
         const submenuDiv = document.createElement("div");
         submenuDiv.classList.add("collapse");
         submenuDiv.setAttribute("id", `collapse${item.title}`);
-
-        // Create a div for the submenu items
         const submenuItemsDiv = document.createElement("div");
         submenuItemsDiv.classList.add(
           "bg-white",
@@ -194,8 +184,6 @@
           "collapse-inner",
           "rounded"
         );
-
-        // Loop through the submenu items and create the corresponding HTML elements
         for (let submenuItem of item.submenu) {
           const submenuLink = document.createElement("a");
           submenuLink.classList.add("collapse-item");
@@ -206,25 +194,19 @@
           submenuLink.innerText = submenuItem.title;
           submenuItemsDiv.appendChild(submenuLink);
         }
-
-        // Append the submenu items div to the submenu div
         submenuDiv.appendChild(submenuItemsDiv);
-
-        // Append the submenu div to the list item
         li.appendChild(submenuDiv);
       }
-
-      // Append the list item to the sidebar
       sidebar.appendChild(li);
     }
-    const sidebarToggle = document.createElement('button');
-    sidebarToggle.classList.add("rounded-circle","border-0");
-    sidebarToggle.setAttribute('id','sidebarToggle');
+    const sidebarToggle = document.createElement("button");
+    sidebarToggle.classList.add("rounded-circle", "border-0");
+    sidebarToggle.setAttribute("id", "sidebarToggle");
     sidebarToggle.addEventListener("click", function () {
       sidebar.classList.toggle("toggled");
     });
-    const sidebarToggleDiv = document.createElement('div');
-    sidebarToggleDiv.classList.add("text-center","d-none","d-md-inline");
+    const sidebarToggleDiv = document.createElement("div");
+    sidebarToggleDiv.classList.add("text-center", "d-none", "d-md-inline");
     sidebarToggleDiv.appendChild(sidebarToggle);
     sidebar.appendChild(sidebarToggleDiv);
   }
@@ -343,37 +325,9 @@
 <script>
   $(document).ready(async () => {
     try {
-      montaMenu([
-        {
-          title: "Dashboard",
-          iconClass: "fas fa-fw fa-tachometer-alt",
-          link: "inicio",
-          active: true,
-        },
-        {
-          title: "Acadêmico",
-          iconClass: "fas fa-fw fa-cog",
-          submenu: [
-            {
-              title: "Frequência",
-              link: "frequencia",
-            },
-            {
-              title: "Certificado",
-              link: "certificado",
-            },
-            {
-              title: "Pagamento",
-              link: "pagamento",
-            },
-          ],
-        },
-        {
-          title: "Validar Certificado",
-          iconClass: "fas fa-fw fa-folder",
-          submenu: [],
-        },
-      ]);
+      const menuItens =  JSON.parse('<?!= JSON.stringify(getMenu()) ?>');
+      console.log(menuItens);
+      montaMenu(menuItens);
     } catch (error) {
       console.error(error);
     }
@@ -382,7 +336,7 @@
       $("#profile-picture").attr("src", "<?!= data.user.foto ?>");
       $("#profile-name").text("<?!= data.user.nome ?>");
       $("#profile-role").text("Administrador");
-      /* 
+      /*
       var dropdowns = "";
       dropdowns = "<?!= JSON.stringify(data.dropdowns) ?>";
       const x = 0;

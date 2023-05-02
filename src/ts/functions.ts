@@ -14,118 +14,175 @@ export function convertePlanilhaEmJSON(
   const jsonString = JSON.stringify(json);
   return jsonString;
 }
+declare type Folder = {
+  title: string | undefined;
+  id: string | undefined;
+};
+
 export class Diretorio {
-  static root = DriveApp.getFolderById("1WOhffBcRIfDORM5FkuvfO1v7j_bbVdHV");
+  static root = Diretorio.listRootFolders();
+  private static getFolderId(folderName: string): string {
+    var query =
+      "mimeType='application/vnd.google-apps.folder' and trashed=false and name='" +
+      folderName +
+      "'";
+    var options: any = {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer " + ScriptApp.getOAuthToken(),
+      },
+    };
+    var response = UrlFetchApp.fetch(
+      "https://www.googleapis.com/drive/v3/files?q=" +
+        encodeURIComponent(query),
+      options
+    );
+    var result = JSON.parse(response.getContentText());
+    if (result.files.length == 0) {
+      throw new Error("Pasta não encontrada: " + folderName);
+    } else {
+      return result.files[0].id;
+    }
+  }
+  private static listFoldersInDirectory(
+    parentFolderName: string,
+    isId = false
+  ): Folder[] {
+    if (!isId) parentFolderName = Diretorio.getFolderId(parentFolderName);
+    const query =
+      (parentFolderName == "root" ? "root" : '"' + parentFolderName + '"') +
+      ' in parents and trashed = false and mimeType = "application/vnd.google-apps.folder"';
+    let folders;
+    let pageToken = null;
+    let foldersList: Folder[] = [];
+    do {
+      try {
+        folders = Drive.Files?.list({
+          q: query,
+          maxResults: 100,
+          pageToken: pageToken,
+        });
+        if (!folders || !folders.items || folders.items.length === 0) {
+          throw new Error("Nenhuma pasta encontrada em " + parentFolderName);
+        }
+        for (let i = 0; i < folders.items.length; i++) {
+          const folder = folders.items[i];
+          foldersList.push({ title: folder.title, id: folder.id });
+        }
+        pageToken = folders.nextPageToken;
+      } catch (err) {
+        Logger.log(err);
+        throw new Error("Arquivo não encontrado.");
+      }
+    } while (pageToken);
+    return foldersList;
+  }
+  static createFolderInsideAnother(folderName: string, parentFolderId: string) {
+    parentFolderId = Diretorio.getFolderId(parentFolderId);
+    var folder = {
+      name: folderName,
+      mimeType: "application/vnd.google-apps.folder",
+      parents: [parentFolderId],
+    };
+    var options: any = {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + ScriptApp.getOAuthToken(),
+        "Content-Type": "application/json",
+      },
+      payload: JSON.stringify(folder),
+    };
+    var response = UrlFetchApp.fetch(
+      "https://www.googleapis.com/drive/v3/files",
+      options
+    );
+    var result = JSON.parse(response.getContentText());
+    return result.id;
+  }
+  private static createFolderInRoot(folderName: string) {
+    folderName = "Banco de Dados";
+    var folder = {
+      name: folderName,
+      mimeType: "application/vnd.google-apps.folder",
+    };
+    var options: any = {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + ScriptApp.getOAuthToken(),
+        "Content-Type": "application/json",
+      },
+      payload: JSON.stringify(folder),
+    };
+    var response = UrlFetchApp.fetch(
+      "https://www.googleapis.com/drive/v3/files",
+      options
+    );
+    var result = JSON.parse(response.getContentText());
+    return result.id;
+  }
+  static listRootFolders() {
+    const query =
+      '"root" in parents and trashed = false and mimeType = "application/vnd.google-apps.folder"';
+    let folders;
+    let pageToken = null;
+    let folderList = [];
+    do {
+      try {
+        folders = Drive.Files?.list({
+          q: query,
+          maxResults: 100,
+          pageToken: pageToken,
+        });
+        if (!folders || !folders.items || folders.items.length === 0) {
+          throw new Error("No folders found.");
+        }
+        for (let i = 0; i < folders.items.length; i++) {
+          const folder = folders.items[i];
+          folderList.push({ title: folder.title, id: folder.id });
+          //console.log('%s (ID: %s)', folder.title, folder.id);
+        }
+        pageToken = folders.nextPageToken;
+      } catch (err: any) {
+        throw new Error(err.message);
+      }
+    } while (pageToken);
+    return folderList;
+  }
   static abrir(
-    pastaOrigem: GoogleAppsScript.Drive.Folder,
-    nomePastaDestino: string
-  ): GoogleAppsScript.Drive.Folder {
-    let pastas = pastaOrigem.getFoldersByName(nomePastaDestino);
-    if (pastas.hasNext()) {
-      return pastas.next();
+    pastaOrigem: Folder[],
+    nomePastaDestino: string,
+    subpastas = true
+  ): any {
+    let pastas = pastaOrigem.filter((x) => x.title == nomePastaDestino);
+    if (pastas.length > 0 && pastas[0].id) {
+      if (!subpastas) return pastas[0];
+      else return Diretorio.listFoldersInDirectory(pastas[0].id, true);
     } else {
       throw new Error(`Não foi possível abrir ${nomePastaDestino}!`);
     }
   }
-  static porCaminho(caminho: string) {
+  static porCaminho(caminho: string, subpastas = true) {
     const itens = caminho.split("/");
     const pos =
       itens[itens.length - 1] == "" ? itens.length - 2 : itens.length - 1;
-    let pasta = this.root;
+    let pasta = Diretorio.abrir(Diretorio.root, "Banco de Dados");
     for (let i = 1; i <= pos; i++) {
-      pasta = Diretorio.abrir(pasta, itens[i]);
+      if (!subpastas && i == pos)
+        pasta = Diretorio.abrir(pasta, itens[i], false);
+      else pasta = Diretorio.abrir(pasta, itens[i]);
     }
     return pasta;
   }
-  static subpastasEmJson(pasta: GoogleAppsScript.Drive.Folder) {
-    const subpastas = pasta.getFolders();
-    let json = [];
-    while (subpastas.hasNext()) {
-      const subpasta = subpastas.next();
-      json.push(subpasta.getName());
-    }
+  static subpastasEmJson(pasta: Folder[]) {
+    const subpastas = pasta;
+    let json: string[] = [];
+    subpastas.forEach((subpasta) => {
+      if (subpasta.title) json.push(subpasta.title);
+    });
     return json;
   }
 }
-/*
-    bancodedados/ano/polo/programa/curso/turma/disciplina/frequencia
- */
-/*
-export function getPastaBancoDeDados(): GoogleAppsScript.Drive.Folder {
-  return DriveApp.getFolderById("1WOhffBcRIfDORM5FkuvfO1v7j_bbVdHV");
-}
 
-export function abrePastaAno(ano: string): GoogleAppsScript.Drive.Folder {
-  const pasta = getPastaBancoDeDados();
-  return Diretorio.abrir(pasta, ano);
-}
-export function abrePastaPolo(
-  ano: string,
-  polo: string
-): GoogleAppsScript.Drive.Folder {
-  const pasta = abrePastaAno(ano);
-  return Diretorio.abrir(pasta, polo);
-}
-export function abrePastaPrograma(
-  ano: string,
-  polo: string,
-  programa: string
-): GoogleAppsScript.Drive.Folder {
-  const pasta = abrePastaPolo(ano, polo);
-  return Diretorio.abrir(pasta, programa);
-}
-export function abrePastaCurso(
-  ano: string,
-  polo: string,
-  programa: string,
-  curso: string
-): GoogleAppsScript.Drive.Folder {
-  const pasta = abrePastaPrograma(ano, polo, programa);
-  return Diretorio.abrir(pasta, curso);
-}
-export function abrePastaTurma(
-  ano: string,
-  polo: string,
-  programa: string,
-  curso: string,
-  turma: string
-): GoogleAppsScript.Drive.Folder {
-  const pasta = abrePastaCurso(ano, polo, programa, curso);
-  return Diretorio.abrir(pasta, turma);
-}
-export function abrePastaDisciplina(
-  ano: string,
-  polo: string,
-  programa: string,
-  curso: string,
-  turma: string,
-  disciplina: string
-): GoogleAppsScript.Drive.Folder {
-  const pasta = abrePastaTurma(ano, polo, programa, curso, turma);
-  return Diretorio.abrir(pasta, disciplina);
-}
-*/
-export function todosDiretoriosEmJSON(): string {
-  var root = Diretorio.porCaminho("/");
-  var data = goesDown(root);
-  var json = data;
-  return json;
-}
-
-export function goesDown(node: GoogleAppsScript.Drive.Folder): any {
-  var folders = node.getFolders();
-  var data = [];
-  while (folders.hasNext()) {
-    var folder = folders.next();
-    var folderInfo = {
-      name: folder.getName(),
-      //id: folder.getId(),
-      subfolders: goesDown(folder),
-    };
-    data.push(folderInfo);
-  }
-  return data;
-}
 export function abrePlanilhaFrequencia(
   ano: string,
   polo: string,
@@ -135,39 +192,15 @@ export function abrePlanilhaFrequencia(
   disciplina: string
 ) {
   const pasta = Diretorio.porCaminho(
-    `/${ano}/${polo}/${programa}/${curso}/${turma}/${disciplina}`
+    `/${ano}/${polo}/${programa}/${curso}/${turma}/${disciplina}`,
+    false
   );
-  const arquivoPlanilha = getOrCreatePlanilha(pasta, "Frequência");
-  const planilha = SpreadsheetApp.open(arquivoPlanilha);
+  const urlPlanilha = getOrCreatePlanilha(pasta, "Frequência");
+  const planilha = SpreadsheetApp.openByUrl(urlPlanilha);
   return planilha;
 }
 
-export function getAnos() {
-  const pasta = Diretorio.porCaminho(`/`);
-  return Diretorio.subpastasEmJson(pasta);
-}
-export function getPolos(ano: string) {
-  const pasta = Diretorio.porCaminho(`/${ano}`);
-  return Diretorio.subpastasEmJson(pasta);
-}
-export function getProgramas(ano: string, polo: string) {
-  const pasta = Diretorio.porCaminho(`/${ano}/${polo}`);
-  return Diretorio.subpastasEmJson(pasta);
-}
-export function getCursos(ano: string, polo: string, programa: string) {
-  const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}`);
-  return Diretorio.subpastasEmJson(pasta);
-}
-export function getTurmas(
-  ano: string,
-  polo: string,
-  programa: string,
-  curso: string
-) {
-  const pasta = Diretorio.porCaminho(`/${ano}/${polo}/${programa}/${curso}`);
-  return Diretorio.subpastasEmJson(pasta);
-}
-export function getDisciplinas(
+export function abrePlanilhaAlunos(
   ano: string,
   polo: string,
   programa: string,
@@ -175,22 +208,60 @@ export function getDisciplinas(
   turma: string
 ) {
   const pasta = Diretorio.porCaminho(
-    `/${ano}/${polo}/${programa}/${curso}/${turma}`
+    `/${ano}/${polo}/${programa}/${curso}/${turma}`,
+    false
   );
-  return Diretorio.subpastasEmJson(pasta);
+  const urlPlanilha = getOrCreatePlanilha(pasta, "Alunos");
+  const planilha = SpreadsheetApp.openByUrl(urlPlanilha);
+  return planilha;
 }
-export function getOrCreatePlanilha(
-  pasta: GoogleAppsScript.Drive.Folder,
-  nomeArquivo: string
-) {
-  var arquivos = pasta.getFilesByName(nomeArquivo);
-  if (arquivos.hasNext()) {
-    return arquivos.next();
-  } else {
-    var planilha = SpreadsheetApp.create(nomeArquivo);
-    DriveApp.getFileById(planilha.getId()).moveTo(pasta);
-    return pasta.getFilesByName(nomeArquivo).next();
+
+/**
+ * Gets or creates a Google Sheets file with the given name in the specified folder.
+ * @param pasta The folder where the file should be created or searched.
+ * @param nomeArquivo The name of the Google Sheets file.
+ * @returns The Google Sheets file object.
+ */
+export function getOrCreatePlanilha(pasta:Folder, nomeArquivo:string):string {
+  // Search for the file with the given name in the folder.
+  const pastaId=pasta.id
+  const accessToken = ScriptApp.getOAuthToken();
+  const url = `https://www.googleapis.com/drive/v3/files?q=name='${nomeArquivo}'+and+mimeType='application/vnd.google-apps.spreadsheet'+and+trashed=false+and+'${pastaId}'+in+parents&fields=files(id,name,mimeType,parents,webViewLink)`;
+  const headers = { Authorization: `Bearer ${accessToken}` };
+  const params:any = {
+    headers: headers,
+    method: 'GET',
+    contentType: 'application/json',
+    muteHttpExceptions: true
+  };
+
+  const response = UrlFetchApp.fetch(url, params);
+  const files = JSON.parse(response.getContentText()).files;
+  
+  if (files.length > 0) {
+    // If the file already exists, return its URL.
+    console.log(files[0])
+    return files[0].webViewLink;
   }
+
+  // If the file doesn't exist, create it in the folder.
+  const metadata = {
+    name: nomeArquivo,
+    parents: [pastaId],
+    mimeType: 'application/vnd.google-apps.spreadsheet'
+  };
+  const options:any = {
+    headers: headers,
+    method: 'POST',
+    contentType: 'application/json',
+    payload: JSON.stringify(metadata),
+    muteHttpExceptions: true
+  };
+
+  const fileResponse = UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files', options);
+  const newFile = JSON.parse(fileResponse.getContentText());
+  
+  return newFile.webViewLink;
 }
 
 export function getCertificado(data: any) {
@@ -276,24 +347,38 @@ export function getToken() {
   return ScriptApp.getOAuthToken();
 }
 
-export function getInfoCurso(ano: string, polo: string, programa: string) {
-  const pastaPrograma = Diretorio.porCaminho(`/${ano}/${polo}/${programa}`);
-  const arquivoPlanilha = getOrCreatePlanilha(pastaPrograma, "InfoCurso");
-  return convertePlanilhaEmJSON(arquivoPlanilha);
-}
-
-export function getInfoTurma(
+export function copiaAlunosParaFrequencia(
   ano: string,
   polo: string,
   programa: string,
   curso: string,
   turma: string
 ) {
-  const pastaTurma = Diretorio.porCaminho(
-    `/${ano}/${polo}/${programa}/${curso}/${turma}`
-  );
-  const arquivoPlanilha = getOrCreatePlanilha(pastaTurma, "InfoTurma");
-  return convertePlanilhaEmJSON(arquivoPlanilha);
+  const planilhaAluno = abrePlanilhaAlunos(
+    ano,
+    polo,
+    programa,
+    curso,
+    turma
+  ).getSheets()[0];
+  const alunos = planilhaAluno.getRange("A:A").getValues();
+  //@ts-ignore
+  const disciplinas: any[] = getDisciplinas(ano, polo, programa, curso, turma);
+  disciplinas.forEach((disciplina) => {
+    const planilhaDisciplina = abrePlanilhaFrequencia(
+      ano,
+      polo,
+      programa,
+      curso,
+      turma,
+      disciplina
+    ).getSheets()[0];
+    const transposedAlunos = alunos.map((aluno) => [aluno[0]]);
+    console.log(planilhaDisciplina.getName());
+    planilhaDisciplina
+      .getRange(1, 1, alunos.length, 1)
+      .setValues(transposedAlunos);
+  });
 }
 
 export function getFrequencia(
@@ -304,6 +389,7 @@ export function getFrequencia(
   turma: string,
   disciplina: string
 ) {
+  copiaAlunosParaFrequencia(ano, polo, programa, curso, turma);
   const planilha = abrePlanilhaFrequencia(
     ano,
     polo,
